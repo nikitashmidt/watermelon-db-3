@@ -3,9 +3,11 @@ package com.nozbe.watermelondb;
 import android.content.Context;
 import android.database.Cursor;
 
-import net.sqlcipher.database.SQLiteCursor;
 import net.sqlcipher.database.SQLiteDatabase;
 import net.sqlcipher.database.SQLiteDatabase.CursorFactory;
+import net.sqlcipher.database.SQLiteCursor;
+import net.sqlcipher.database.SQLiteCursorDriver;
+import net.sqlcipher.database.SQLiteQuery;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -104,23 +106,29 @@ public class WMDatabase {
         String[] rawArgs = new String[args.length];
         Arrays.fill(rawArgs, "");
         return db.rawQueryWithFactory(
-                (db1, driver, editTable, query) -> {
-                    for (int i = 0; i < args.length; i++) {
-                        Object arg = args[i];
-                        if (arg instanceof String) {
-                            query.bindString(i + 1, (String) arg);
-                        } else if (arg instanceof Boolean) {
-                            query.bindLong(i + 1, (Boolean) arg ? 1 : 0);
-                        } else if (arg instanceof Double) {
-                            query.bindDouble(i + 1, (Double) arg);
-                        } else if (arg == null) {
-                            query.bindNull(i + 1);
-                        } else {
-                            throw new IllegalArgumentException("Bad query arg type: " + arg.getClass().getCanonicalName());
+                new CursorFactory() {
+                    @Override
+                    public Cursor newCursor(SQLiteDatabase db1, SQLiteCursorDriver driver, String editTable, SQLiteQuery query) {
+                        for (int i = 0; i < args.length; i++) {
+                            Object arg = args[i];
+                            if (arg instanceof String) {
+                                query.bindString(i + 1, (String) arg);
+                            } else if (arg instanceof Boolean) {
+                                query.bindLong(i + 1, (Boolean) arg ? 1 : 0);
+                            } else if (arg instanceof Double) {
+                                query.bindDouble(i + 1, (Double) arg);
+                            } else if (arg == null) {
+                                query.bindNull(i + 1);
+                            } else {
+                                throw new IllegalArgumentException("Bad query arg type: " + arg.getClass().getCanonicalName());
+                            }
                         }
+                        return new SQLiteCursor(db1, driver, editTable, query);
                     }
-                    return new SQLiteCursor(driver, editTable, query);
-                }, sql, rawArgs, null, null
+                },
+                sql,
+                rawArgs,
+                null
         );
     }
 
