@@ -138,13 +138,13 @@ public class WMDatabase {
 
     public int count(String query, Object[] args) {
         try (Cursor cursor = rawQuery(query, args)) {
-            cursor.moveToFirst();
-            int columnIndex = cursor.getColumnIndex("count");
-            if (cursor.getCount() > 0) {
-                return cursor.getInt(columnIndex);
-            } else {
-                return 0;
+            if (cursor.getCount() > 0 && cursor.moveToFirst()) {
+                int columnIndex = cursor.getColumnIndex("count");
+                if (columnIndex >= 0) {
+                    return cursor.getInt(columnIndex);
+                }
             }
+            return 0;
         }
     }
 
@@ -154,24 +154,23 @@ public class WMDatabase {
 
     public String getFromLocalStorage(String key) {
         try (Cursor cursor = rawQuery(Queries.select_local_storage, new Object[]{key})) {
-            cursor.moveToFirst();
-            if (cursor.getCount() > 0) {
+            if (cursor.getCount() > 0 && cursor.moveToFirst()) {
                 return cursor.getString(0);
-            } else {
-                return null;
             }
+            return null;
         }
     }
 
     private ArrayList<String> getAllTables() {
         ArrayList<String> allTables = new ArrayList<>();
         try (Cursor cursor = rawQuery(Queries.select_tables)) {
-            cursor.moveToFirst();
-            int nameIndex = cursor.getColumnIndex("name");
-            if (nameIndex > -1) {
-                do {
-                    allTables.add(cursor.getString(nameIndex));
-                } while (cursor.moveToNext());
+            if (cursor.getCount() > 0 && cursor.moveToFirst()) {
+                int nameIndex = cursor.getColumnIndex("name");
+                if (nameIndex > -1) {
+                    do {
+                        allTables.add(cursor.getString(nameIndex));
+                    } while (cursor.moveToNext());
+                }
             }
         }
         return allTables;
