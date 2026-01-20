@@ -43,13 +43,13 @@ public class WMDatabaseBridge extends ReactContextBaseJavaModule {
     private final Map<Integer, Connection> connections = new HashMap<>();
 
     @ReactMethod
-    public void initialize(final Integer tag, final String databaseName, final int schemaVersion, final boolean unsafeNativeReuse, final Promise promise) {
+    public void initialize(final Integer tag, final String databaseName, final int schemaVersion, final String password, final boolean unsafeNativeReuse, final Promise promise) {
         if (connections.containsKey(tag)) {
             throw new IllegalStateException("A driver with tag " + tag + " already set up");
         }
         final WritableMap promiseMap = Arguments.createMap();
         try {
-            connections.put(tag, new Connection.Connected(new WMDatabaseDriver((Context) reactContext, databaseName, schemaVersion, unsafeNativeReuse)));
+            connections.put(tag, new Connection.Connected(new WMDatabaseDriver((Context) reactContext, databaseName, password, schemaVersion, unsafeNativeReuse)));
             promiseMap.putString("code", "ok");
             promise.resolve(promiseMap);
         } catch (SchemaNeededError e) {
@@ -67,14 +67,14 @@ public class WMDatabaseBridge extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void setUpWithSchema(final Integer tag, final String databaseName, final String schema, final int schemaVersion, final boolean unsafeNativeReuse, final Promise promise) {
-        connectDriver(tag, new WMDatabaseDriver(reactContext, databaseName, new Schema(schemaVersion, schema), unsafeNativeReuse), promise);
+    public void setUpWithSchema(final Integer tag, final String databaseName, final String schema, final int schemaVersion, final String password, final boolean unsafeNativeReuse, final Promise promise) {
+        connectDriver(tag, new WMDatabaseDriver(reactContext, databaseName, password, new Schema(schemaVersion, schema), unsafeNativeReuse), promise);
     }
 
     @ReactMethod
-    public void setUpWithMigrations(final Integer tag, final String databaseName, final String migrations, final int fromVersion, final int toVersion, final boolean unsafeNativeReuse, final Promise promise) {
+    public void setUpWithMigrations(final Integer tag, final String databaseName, final String migrations, final int fromVersion, final int toVersion, final String password, final boolean unsafeNativeReuse, final Promise promise) {
         try {
-            connectDriver(tag, new WMDatabaseDriver(reactContext, databaseName, new MigrationSet(fromVersion, toVersion, migrations), unsafeNativeReuse), promise);
+            connectDriver(tag, new WMDatabaseDriver(reactContext, databaseName, password, new MigrationSet(fromVersion, toVersion, migrations), unsafeNativeReuse), promise);
         } catch (Exception e) {
             disconnectDriver(tag);
             promise.reject(e);

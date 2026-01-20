@@ -17,16 +17,18 @@ const { WMDatabaseBridge, WMDatabaseJSIBridge } = NativeModules
 class SqliteNativeModulesDispatcher implements SqliteDispatcher {
   _tag: ConnectionTag
   _unsafeNativeReuse: boolean
+  _password: string
   _bridge: any
 
   constructor(
     tag: ConnectionTag,
     bridge: any,
-    { experimentalUnsafeNativeReuse }: SqliteDispatcherOptions,
+    { experimentalUnsafeNativeReuse, password }: SqliteDispatcherOptions,
   ): void {
     this._tag = tag
     this._bridge = bridge
     this._unsafeNativeReuse = experimentalUnsafeNativeReuse
+    this._password = password ?? ''
     if (process.env.NODE_ENV !== 'production') {
       invariant(
         this._bridge,
@@ -51,6 +53,7 @@ class SqliteNativeModulesDispatcher implements SqliteDispatcher {
       Platform.OS === 'android'
     ) {
       // FIXME: Hacky, refactor once native reuse isn't an "unsafe experimental" option
+      args.push(this._password)
       args.push(this._unsafeNativeReuse)
     }
     fromPromise(this._bridge[methodName](this._tag, ...args), callback)

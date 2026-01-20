@@ -2,7 +2,6 @@ package com.nozbe.watermelondb;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 
 import android.os.Trace;
 
@@ -12,6 +11,8 @@ import com.facebook.react.bridge.WritableArray;
 import com.nozbe.watermelondb.utils.MigrationSet;
 import com.nozbe.watermelondb.utils.Pair;
 import com.nozbe.watermelondb.utils.Schema;
+
+import net.sqlcipher.database.SQLiteDatabase;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,11 +27,25 @@ public class WMDatabaseDriver {
     private final Map<String, List<String>> cachedRecords;
 
     public WMDatabaseDriver(Context context, String dbName) {
-        this(context, dbName, false);
+        this(context, dbName, "", false);
     }
 
     public WMDatabaseDriver(Context context, String dbName, int schemaVersion, boolean unsafeNativeReuse) {
-        this(context, dbName, unsafeNativeReuse);
+        this(context, dbName, "", unsafeNativeReuse);
+        SchemaCompatibility compatibility = isCompatible(schemaVersion);
+        if (compatibility instanceof SchemaCompatibility.NeedsSetup) {
+            throw new SchemaNeededError();
+        } else if (compatibility instanceof SchemaCompatibility.NeedsMigration) {
+            throw new MigrationNeededError(
+                    ((SchemaCompatibility.NeedsMigration) compatibility).fromVersion
+            );
+
+        }
+
+    }
+
+    public WMDatabaseDriver(Context context, String dbName, String password, int schemaVersion, boolean unsafeNativeReuse) {
+        this(context, dbName, password, unsafeNativeReuse);
         SchemaCompatibility compatibility = isCompatible(schemaVersion);
         if (compatibility instanceof SchemaCompatibility.NeedsSetup) {
             throw new SchemaNeededError();
@@ -44,22 +59,31 @@ public class WMDatabaseDriver {
     }
 
     public WMDatabaseDriver(Context context, String dbName, Schema schema, boolean unsafeNativeReuse) {
-        this(context, dbName, unsafeNativeReuse);
+        this(context, dbName, "", unsafeNativeReuse);
         unsafeResetDatabase(schema);
     }
 
     public WMDatabaseDriver(Context context, String dbName, MigrationSet migrations, boolean unsafeNativeReuse) {
-        this(context, dbName, unsafeNativeReuse);
+        this(context, dbName, "", unsafeNativeReuse);
         migrate(migrations);
     }
 
-    public WMDatabaseDriver(Context context, String dbName, boolean unsafeNativeReuse) {
-        this.database = unsafeNativeReuse ? WMDatabase.getInstance(dbName, context,
-                SQLiteDatabase.CREATE_IF_NECESSARY |
-                        SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING) :
-                WMDatabase.buildDatabase(dbName, context,
-                        SQLiteDatabase.CREATE_IF_NECESSARY |
-                                SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING);
+    public WMDatabaseDriver(Context context, String dbName, String password, Schema schema, boolean unsafeNativeReuse) {
+        this(context, dbName, password, unsafeNativeReuse);
+        unsafeResetDatabase(schema);
+    }
+
+    public WMDatabaseDriver(Context context, String dbName, String password, MigrationSet migrations, boolean unsafeNativeReuse) {
+        this(context, dbName, password, unsafeNativeReuse);
+        migrate(migrations);
+    }
+
+    public WMDatabaseDriver(Context context, String dbName, String password, boolean unsafeNativeReuse) {
+        // NOTE: when using SQLCipher, we enable WAL explicitly after opening
+        boolean enableWriteAheadLogging = true;
+        this.database = unsafeNativeReuse ?
+                WMDatabase.getInstance(dbName, password, context, enableWriteAheadLogging) :
+                WMDatabase.buildDatabase(dbName, password, context, enableWriteAheadLogging);
         if (BuildConfig.DEBUG) {
             this.log = Logger.getLogger("DB_Driver");
         } else {

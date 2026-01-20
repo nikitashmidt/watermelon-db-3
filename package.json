@@ -1,40 +1,11 @@
 {
+  "main": "./index.js",
+  "sideEffects": false,
+  "types": "src/index.d.ts",
   "name": "@timebyping/watermelondb",
   "description": "Build powerful React Native and React web apps that scale from hundreds to tens of thousands of records and remain fast",
   "version": "0.30.2",
-  "engines": {
-    "node": ">=18"
-  },
-  "scripts": {
-    "up": "yarn",
-    "build": "NODE_ENV=production node ./scripts/make.mjs",
-    "dev": "NODE_ENV=development node ./scripts/make.mjs",
-    "dev:native": "react-native start",
-    "release": "node ./scripts/release.mjs",
-    "prettier": "prettier --write src docs-website/src",
-    "flow": "flow check --color always",
-    "eslint": "eslint ./src -c ./.eslintrc.js --cache --cache-location ./.cache/.eslintcache",
-    "tslint": "tslint --project .",
-    "test": "jest --config=./jest.config.js --forceExit",
-    "ci": "yarn ci:check",
-    "ci:check": "concurrently -c auto -n jest,eslint,flow,ts,tslint 'npm run test' 'npm run eslint' 'npm run flow' 'npm run test:typescript' 'npm run tslint' --kill-others-on-fail",
-    "test:android": "cd native/androidTest && ./gradlew connectedAndroidTest",
-    "test:ios": "scripts/test-ios",
-    "test:windows": "react-native run-windows",
-    "test:windows:ci": "cd native/windowsE2E && npm run e2etest",
-    "test:native": "concurrently -n android,ios 'npm run test:android' 'npm run test:ios' --kill-others-on-fail",
-    "test:typescript": "cd examples/typescript; yarn; npm run test",
-    "ktlint": "cd native/androidTest; ./gradlew ktlint",
-    "ktlint:format": "cd native/androidTest; ./gradlew ktlintFormat",
-    "android:emulator": "./scripts/emulatorWithJavaCheck",
-    "cocoapods": "rm -fr native/iosTest/build/generated && cd native/iosTest && bundle exec pod update hermes-engine --no-repo-update && bundle exec pod install",
-    "docs:version": "cd docs-website && yarn version --no-git-tag-version --no-commit-hooks --new-version",
-    "docs:dev": "./scripts/update-docusaurus && cd docs-website && yarn start",
-    "docs:build": "./scripts/update-docusaurus && cd docs-website && yarn build",
-    "docs:deploy": "./scripts/update-docusaurus && cd docs-website && yarn deploy",
-    "postinstall": "patch-package"
-  },
-  "types": "src/index.d.ts",
+  "engines": {"node": ">=18"},
   "homepage": "https://github.com/pinginc/watermelon-db#readme",
   "bugs": "https://github.com/pinginc/watermelon-db/issues",
   "license": "MIT",
@@ -68,9 +39,7 @@
     "rxjs": "^7.8.1",
     "sql-escape-string": "^1.1.0"
   },
-  "publishConfig": {
-    "access": "public"
-  },
+  "publishConfig": {"access": "public"},
   "devDependencies": {
     "@babel/cli": "^7.24.7",
     "@babel/core": "^7.24.7",

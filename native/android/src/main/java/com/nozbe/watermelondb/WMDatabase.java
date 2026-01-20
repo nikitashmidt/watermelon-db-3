@@ -2,8 +2,10 @@ package com.nozbe.watermelondb;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteCursor;
-import android.database.sqlite.SQLiteDatabase;
+
+import net.sqlcipher.database.SQLiteCursor;
+import net.sqlcipher.database.SQLiteDatabase;
+import net.sqlcipher.database.SQLiteDatabase.CursorFactory;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -21,15 +23,16 @@ public class WMDatabase {
     public static Map<String, WMDatabase> INSTANCES = new HashMap<>();
 
     public static WMDatabase getInstance(String name, Context context) {
-        return getInstance(name, context, SQLiteDatabase.CREATE_IF_NECESSARY | SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING);
+        return getInstance(name, "", context, true);
     }
 
-    public static WMDatabase getInstance(String name, Context context, int openFlags) {
+    public static WMDatabase getInstance(String name, String password, Context context, boolean enableWriteAheadLogging) {
         synchronized (WMDatabase.class) {
-            WMDatabase instance = INSTANCES.getOrDefault(name, null);
+            String instanceKey = name + "|" + (password == null ? "" : password);
+            WMDatabase instance = INSTANCES.getOrDefault(instanceKey, null);
             if (instance == null || !instance.isOpen()) {
-                WMDatabase database = buildDatabase(name, context, openFlags);
-                INSTANCES.put(name, database);
+                WMDatabase database = buildDatabase(name, password, context, enableWriteAheadLogging);
+                INSTANCES.put(instanceKey, database);
                 return database;
             } else {
                 return instance;
@@ -37,12 +40,12 @@ public class WMDatabase {
         }
     }
 
-    public static WMDatabase buildDatabase(String name, Context context, int openFlags) {
-        SQLiteDatabase sqLiteDatabase = WMDatabase.createSQLiteDatabase(name, context, openFlags);
+    public static WMDatabase buildDatabase(String name, String password, Context context, boolean enableWriteAheadLogging) {
+        SQLiteDatabase sqLiteDatabase = WMDatabase.createSQLiteDatabase(name, password, context, enableWriteAheadLogging);
         return new WMDatabase(sqLiteDatabase);
     }
 
-    private static SQLiteDatabase createSQLiteDatabase(String name, Context context, int openFlags) {
+    private static SQLiteDatabase createSQLiteDatabase(String name, String password, Context context, boolean enableWriteAheadLogging) {
         String path;
         if (name.equals(":memory:") || name.contains("mode=memory")) {
             context.getCacheDir().delete();
@@ -51,7 +54,13 @@ public class WMDatabase {
             // On some systems there is some kind of lock on `/databases` folder ¯\_(ツ)_/¯
             path = context.getDatabasePath("" + name + ".db").getPath().replace("/databases", "");
         }
-        return SQLiteDatabase.openDatabase(path, null, openFlags);
+        String safePassword = password == null ? "" : password;
+        SQLiteDatabase.loadLibs(context);
+        SQLiteDatabase database = SQLiteDatabase.openOrCreateDatabase(path, safePassword, (CursorFactory) null, null);
+        if (enableWriteAheadLogging) {
+            database.enableWriteAheadLogging();
+        }
+        return database;
     }
 
     public void setUserVersion(int version) {

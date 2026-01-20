@@ -38,6 +38,8 @@ dependencies {
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getExtOrDefault('kotlinVersion')}"
+    // Needed for encrypted SQLite databases (passphrase option) on Android
+    implementation 'net.zetetic:android-database-sqlcipher:4.6.0'
 }
 
 repositories {
