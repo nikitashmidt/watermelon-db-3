@@ -1,8 +1,8 @@
 package com.nozbe.watermelondb;
 
 import android.content.Context;
-import android.database.Cursor;
 
+import net.sqlcipher.Cursor;
 import net.sqlcipher.database.SQLiteDatabase;
 import net.sqlcipher.database.SQLiteDatabase.CursorFactory;
 import net.sqlcipher.database.SQLiteCursor;
@@ -108,7 +108,7 @@ public class WMDatabase {
         return db.rawQueryWithFactory(
                 new CursorFactory() {
                     @Override
-                    public Cursor newCursor(SQLiteDatabase db1, SQLiteCursorDriver driver, String editTable, SQLiteQuery query) {
+                    public net.sqlcipher.Cursor newCursor(SQLiteDatabase db1, SQLiteCursorDriver driver, String editTable, SQLiteQuery query) {
                         for (int i = 0; i < args.length; i++) {
                             Object arg = args[i];
                             if (arg instanceof String) {

@@ -2,7 +2,6 @@ package com.nozbe.watermelondb;
 
 import android.content.Context;
 import android.database.Cursor;
-
 import android.os.Trace;
 
 import com.facebook.react.bridge.Arguments;
