@@ -62,6 +62,7 @@ public class WMDatabase {
         if (enableWriteAheadLogging) {
             database.enableWriteAheadLogging();
         }
+        database.execSQL("PRAGMA case_sensitive_like = OFF");
         return database;
     }
 
