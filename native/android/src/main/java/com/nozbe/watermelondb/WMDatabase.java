@@ -62,8 +62,7 @@ public class WMDatabase {
         if (enableWriteAheadLogging) {
             database.enableWriteAheadLogging();
         }
-        database.execSQL("PRAGMA case_sensitive_like = OFF");
-        database.execSQL("PRAGMA encoding = 'UTF-8'");
+        database.execSQL("PRAGMA case_sensitive_like=OFF;");
         return database;
     }
 
