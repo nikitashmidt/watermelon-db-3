@@ -63,6 +63,9 @@ public class WMDatabase {
             database.enableWriteAheadLogging();
         }
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
+        database.execSQL("SELECT icu_load_collation('ru', 'RUSSIAN_CI')");
+        database.execSQL("SELECT icu_load_collation('ru', 'RUSSIAN')");
+        database.execSQL("SELECT icu_load_collation('ru', 'RU')");
         return database;
     }
 
