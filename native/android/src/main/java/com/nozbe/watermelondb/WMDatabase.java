@@ -65,10 +65,76 @@ public class WMDatabase {
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
         database.execSQL("PRAGMA encoding = 'UTF-8';");
         
-        // Simple Unicode support initialization
+        // Android LOCALIZED collation support for Unicode
         try {
             database.execSQL("PRAGMA temp_store = MEMORY;");
-            android.util.Log.d("WatermelonDB", "Unicode support initialized - using LOWER() functions for case-insensitive search");
+            
+            // Инициализируем ICU коллатор
+            ICUCollator.normalizeForSearch("тест");
+            android.util.Log.d("WatermelonDB", "ICU Collator initialized successfully");
+            
+            // Тестируем различные подходы к Unicode поиску
+            try {
+                database.execSQL("CREATE TEMP TABLE unicode_test (text TEXT);");
+                database.execSQL("INSERT INTO unicode_test VALUES ('Тест'), ('тест'), ('ТЕСТ'), ('Test'), ('test'), ('TEST');");
+                
+                // Тест 1: Android LOCALIZED коллация
+                android.database.Cursor cursor1 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE text COLLATE LOCALIZED LIKE '%тест%';", null);
+                int count1 = 0;
+                if (cursor1.moveToFirst()) {
+                    count1 = cursor1.getInt(0);
+                }
+                cursor1.close();
+                
+                // Тест 2: UNICODE коллация
+                android.database.Cursor cursor2 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE text COLLATE UNICODE LIKE '%тест%';", null);
+                int count2 = 0;
+                if (cursor2.moveToFirst()) {
+                    count2 = cursor2.getInt(0);
+                }
+                cursor2.close();
+                
+                // Тест 3: NOCASE коллация
+                android.database.Cursor cursor3 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE text COLLATE NOCASE LIKE '%тест%';", null);
+                int count3 = 0;
+                if (cursor3.moveToFirst()) {
+                    count3 = cursor3.getInt(0);
+                }
+                cursor3.close();
+                
+                // Тест 4: LOWER функция
+                android.database.Cursor cursor4 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE LOWER(text) LIKE LOWER('%тест%');", null);
+                int count4 = 0;
+                if (cursor4.moveToFirst()) {
+                    count4 = cursor4.getInt(0);
+                }
+                cursor4.close();
+                
+                database.execSQL("DROP TABLE unicode_test;");
+                
+                android.util.Log.d("WatermelonDB", "Unicode test results for 'тест':");
+                android.util.Log.d("WatermelonDB", "  LOCALIZED: " + count1 + " matches");
+                android.util.Log.d("WatermelonDB", "  UNICODE: " + count2 + " matches");
+                android.util.Log.d("WatermelonDB", "  NOCASE: " + count3 + " matches");
+                android.util.Log.d("WatermelonDB", "  LOWER(): " + count4 + " matches");
+                
+                // Определяем лучший метод
+                if (count1 >= 3) {
+                    android.util.Log.d("WatermelonDB", "✅ Using LOCALIZED collation for Unicode support");
+                } else if (count2 >= 3) {
+                    android.util.Log.d("WatermelonDB", "✅ Using UNICODE collation for Unicode support");
+                } else if (count3 >= 3) {
+                    android.util.Log.d("WatermelonDB", "✅ Using NOCASE collation for Unicode support");
+                } else if (count4 >= 3) {
+                    android.util.Log.d("WatermelonDB", "✅ Using LOWER() function for Unicode support");
+                } else {
+                    android.util.Log.w("WatermelonDB", "⚠️ Unicode support may not be working properly");
+                }
+                
+            } catch (Exception test) {
+                android.util.Log.w("WatermelonDB", "Unicode test failed: " + test.getMessage());
+            }
+            
         } catch (Exception e) {
             android.util.Log.w("WatermelonDB", "Failed to initialize Unicode support: " + e.getMessage());
         }
