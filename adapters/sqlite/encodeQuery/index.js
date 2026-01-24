@@ -53,6 +53,11 @@ var encodeComparison = function (table, comparison) {
     } = comparison;
     return right.values ? "between ".concat((0, _encodeValue.default)(right.values[0]), " and ").concat((0, _encodeValue.default)(right.values[1])) : '';
   }
+
+  // ИЗМЕНЕНИЕ: Для 'like' и 'notLike' добавляем COLLATE UNICODE_NOCASE
+  if ('like' === operator || 'notLike' === operator) {
+    return "".concat(operators[operator], " ").concat(getComparisonRight(table, comparison.right), " COLLATE UNICODE_NOCASE");
+  }
   return "".concat(operators[operator], " ").concat(getComparisonRight(table, comparison.right));
 };
 var encodeWhere = function (table, associations) {
@@ -91,7 +96,8 @@ var encodeWhereCondition = function (associations, table, left, comparison) {
     // $FlowFixMe
     Q.where(left, Q.gt(Q.column(comparison.right.column))), Q.and(Q.where(left, Q.notEq(null)), Q.where(comparison.right.column, null))));
   } else if ('includes' === operator) {
-    return "instr(\"".concat(table, "\".\"").concat(left, "\", ").concat(getComparisonRight(table, comparison.right), ")");
+    // ИЗМЕНЕНИЕ: Для 'includes' также добавляем COLLATE UNICODE_NOCASE, так как это тоже поиск по подстроке
+    return "instr(\"".concat(table, "\".\"").concat(left, "\" COLLATE UNICODE_NOCASE, ").concat(getComparisonRight(table, comparison.right), " COLLATE UNICODE_NOCASE)");
   }
   return "\"".concat(table, "\".\"").concat(left, "\" ").concat(encodeComparison(table, comparison));
 };
@@ -111,7 +117,7 @@ var encodeConditions = function (table, description, associations) {
 // relation, then we need to add `distinct` on the query to ensure there are no duplicates
 var encodeMethod = function (table, countMode, needsDistinct) {
   if (countMode) {
-    return needsDistinct ? "select count(distinct \"".concat(table, "\".\"id\") as \"count\" from \"").concat(table, "\"") : "select count(*) as \"count\" from \"".concat(table, "\"");
+    return needsDistinct ? "select count(distinct \"".concat(table, "\".id) as \"count\" from \"").concat(table, "\"") : "select count(*) as \"count\" from \"".concat(table, "\"");
   }
   return needsDistinct ? "select distinct \"".concat(table, "\".* from \"").concat(table, "\"") : "select \"".concat(table, "\".* from \"").concat(table, "\"");
 };

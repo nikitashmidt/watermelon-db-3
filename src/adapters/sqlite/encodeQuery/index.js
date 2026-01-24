@@ -31,7 +31,7 @@ const getComparisonRight = (table: TableName<any>, comparisonRight: ComparisonRi
   if (comparisonRight.values) {
     return encodeValues(comparisonRight.values)
   } else if (comparisonRight.column) {
-    return `"${table}"."${comparisonRight.column}"`
+    return `\"${table}\".\"${comparisonRight.column}\"`
   }
 
   return typeof comparisonRight.value !== 'undefined' ? encodeValue(comparisonRight.value) : 'null'
@@ -61,6 +61,11 @@ const encodeComparison = (table: TableName<any>, comparison: Comparison) => {
     return right.values
       ? `between ${encodeValue(right.values[0])} and ${encodeValue(right.values[1])}`
       : ''
+  }
+
+  // ИЗМЕНЕНИЕ: Для 'like' и 'notLike' добавляем COLLATE UNICODE_NOCASE
+  if (operator === 'like' || operator === 'notLike') {
+    return `${operators[operator]} ${getComparisonRight(table, comparison.right)} COLLATE UNICODE_NOCASE`
   }
 
   return `${operators[operator]} ${getComparisonRight(table, comparison.right)}`
@@ -112,10 +117,11 @@ const encodeWhereCondition = (
       ),
     )
   } else if (operator === 'includes') {
-    return `instr("${table}"."${left}", ${getComparisonRight(table, comparison.right)})`
+    // ИЗМЕНЕНИЕ: Для 'includes' также добавляем COLLATE UNICODE_NOCASE, так как это тоже поиск по подстроке
+    return `instr(\"${table}\".\"${left}\" COLLATE UNICODE_NOCASE, ${getComparisonRight(table, comparison.right)} COLLATE UNICODE_NOCASE)`
   }
 
-  return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
+  return `\"${table}\".\"${left}\" ${encodeComparison(table, comparison)}`
 }
 
 const encodeAndOr = (
@@ -151,13 +157,13 @@ const encodeMethod = (
 ): string => {
   if (countMode) {
     return needsDistinct
-      ? `select count(distinct "${table}"."id") as "count" from "${table}"`
-      : `select count(*) as "count" from "${table}"`
+      ? `select count(distinct \"${table}\".id) as \"count\" from \"${table}\"`
+      : `select count(*) as \"count\" from \"${table}\"`
   }
 
   return needsDistinct
-    ? `select distinct "${table}".* from "${table}"`
-    : `select "${table}".* from "${table}"`
+    ? `select distinct \"${table}\".* from \"${table}\"`
+    : `select \"${table}\".* from \"${table}\"`
 }
 
 const encodeAssociation =
@@ -179,10 +185,10 @@ const encodeAssociation =
       (clause) => clause.type === 'on' && clause.table === joinedTable,
     )
     const joinKeyword = usesOldJoinStyle ? ' join ' : ' left join '
-    const joinBeginning = `${joinKeyword}"${joinedTable}" on "${joinedTable}".`
+    const joinBeginning = `${joinKeyword}\"${joinedTable}\" on \"${joinedTable}\".`
     return association.type === 'belongs_to'
-      ? `${joinBeginning}"id" = "${mainTable}"."${association.key}"`
-      : `${joinBeginning}"${association.foreignKey}" = "${mainTable}"."id"`
+      ? `${joinBeginning}\"id\" = \"${mainTable}\".\"${association.key}\"`
+      : `${joinBeginning}\"${association.foreignKey}\" = \"${mainTable}\".\"id\"`
   }
 
 const encodeJoin = (description: QueryDescription, associations: QueryAssociation[]): string =>
@@ -194,7 +200,7 @@ const encodeOrderBy = (table: TableName<any>, sortBys: SortBy[]) => {
   }
   const orderBys = sortBys
     .map((sortBy) => {
-      return `"${table}"."${sortBy.sortColumn}" ${sortBy.sortOrder}`
+      return `\"${table}\".\"${sortBy.sortColumn}\" ${sortBy.sortOrder}`
     })
     .join(', ')
   return ` order by ${orderBys}`

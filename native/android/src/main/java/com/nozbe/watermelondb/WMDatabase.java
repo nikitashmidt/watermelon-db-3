@@ -1,6 +1,7 @@
 package com.nozbe.watermelondb;
 
 import android.content.Context;
+import android.util.Log;
 
 import net.sqlcipher.Cursor;
 import net.sqlcipher.database.SQLiteDatabase;
@@ -8,6 +9,7 @@ import net.sqlcipher.database.SQLiteDatabase.CursorFactory;
 import net.sqlcipher.database.SQLiteCursor;
 import net.sqlcipher.database.SQLiteCursorDriver;
 import net.sqlcipher.database.SQLiteQuery;
+import net.sqlcipher.database.SQLiteDatabaseHook;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -58,13 +60,28 @@ public class WMDatabase {
         }
         String safePassword = password == null ? "" : password;
         SQLiteDatabase.loadLibs(context);
-        SQLiteDatabase database = SQLiteDatabase.openOrCreateDatabase(path, safePassword, (CursorFactory) null, null);
+
+        SQLiteDatabaseHook hook = new SQLiteDatabaseHook() {
+            @Override
+            public void preKey(SQLiteDatabase database) {
+            }
+
+            @Override
+            public void postKey(SQLiteDatabase database) {
+                try {
+                    database.execSQL("SELECT icu_load_collation('UNICODE_NOCASE', 'UTF8');");
+                    Log.d("WMDatabase", "ICU collation 'UNICODE_NOCASE' loaded successfully.");
+                } catch (Exception e) {
+                    Log.e("WMDatabase", "Failed to load ICU collation 'UNICODE_NOCASE'", e);
+                }
+            }
+        };
+
+        SQLiteDatabase database = SQLiteDatabase.openOrCreateDatabase(path, safePassword, (CursorFactory) null, hook);
         if (enableWriteAheadLogging) {
             database.enableWriteAheadLogging();
         }
-        // database.execSQL("SELECT load_extension('libsqliteicu.so');");
-        database.execSQL("PRAGMA case_sensitive_like = OFF;");
-        database.execSQL("SELECT icu_load_collation('ru_RU', 'russian');");
+        database.execSQL("PRAGMA encoding = 'UTF-8'");
         return database;
     }
 
@@ -78,8 +95,6 @@ public class WMDatabase {
 
     public void unsafeExecuteStatements(String statements) {
         this.transaction(() -> {
-            // NOTE: This must NEVER be allowed to take user input - split by `;` is not grammar-aware
-            // and so is unsafe. Only works with Watermelon-generated strings known to be safe
             for (String statement : statements.split(";")) {
                 if (!statement.trim().isEmpty()) {
                     this.execute(statement);
@@ -101,11 +116,6 @@ public class WMDatabase {
     }
 
     public Cursor rawQuery(String sql, Object[] args) {
-        // HACK: db.rawQuery only supports String args, and there's no clean way AFAIK to construct
-        // a query with arbitrary args (like with execSQL). However, we can misuse cursor factory
-        // to get the reference of a SQLiteQuery before it's executed
-        // https://github.com/aosp-mirror/platform_frameworks_base/blob/0799624dc7eb4b4641b4659af5b5ec4b9f80dd81/core/java/android/database/sqlite/SQLiteDirectCursorDriver.java#L30
-        // https://github.com/aosp-mirror/platform_frameworks_base/blob/0799624dc7eb4b4641b4659af5b5ec4b9f80dd81/core/java/android/database/sqlite/SQLiteProgram.java#L32
         String[] rawArgs = new String[args.length];
         Arrays.fill(rawArgs, "");
         return db.rawQueryWithFactory(
