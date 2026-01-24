@@ -6,6 +6,7 @@ exports.default = void 0;
 var _common = require("../../../utils/common");
 var Q = _interopRequireWildcard(require("../../../QueryDescription"));
 var _encodeValue = _interopRequireDefault(require("../encodeValue"));
+var _unicodeHelpers = require("../unicodeHelpers");
 function _getRequireWildcardCache(e) { if ("function" != typeof WeakMap) return null; var r = new WeakMap(), t = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(e) { return e ? t : r; })(e); }
 function _interopRequireWildcard(e, r) { if (!r && e && e.__esModule) return e; if (null === e || "object" != typeof e && "function" != typeof e) return { default: e }; var t = _getRequireWildcardCache(r); if (t && t.has(e)) return t.get(e); var n = { __proto__: null }, a = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var u in e) if ("default" !== u && {}.hasOwnProperty.call(e, u)) { var i = a ? Object.getOwnPropertyDescriptor(e, u) : null; i && (i.get || i.set) ? Object.defineProperty(n, u, i) : n[u] = e[u]; } return n.default = e, t && t.set(e, n), n; }
 /* eslint-disable no-use-before-define */
@@ -110,18 +111,31 @@ var encodeWhereCondition = function (associations, table, left, comparison) {
     // $FlowFixMe
     Q.where(left, Q.gt(Q.column(comparison.right.column))), Q.and(Q.where(left, Q.notEq(null)), Q.where(comparison.right.column, null))));
   } else if ('includes' === operator) {
-    // Use LOWER() for case-insensitive Unicode search - SQLCipher doesn't support Unicode collations
-    return "instr(LOWER(\"".concat(table, "\".\"").concat(left, "\"), ").concat(getComparisonRightLower(table, comparison.right), ")");
+    // Use Unicode-aware includes with automatic detection
+    var {
+      sql: sql,
+      processedText: processedText
+    } = (0, _unicodeHelpers.createUnicodeIncludesExpression)("\"".concat(table, "\".\"").concat(left, "\""), comparison.right.value || '');
+    return sql.replace('?', (0, _encodeValue.default)(processedText));
   }
 
-  // For text operations with Unicode support, use LOWER() function
+  // For text operations, use Unicode-aware expressions
   if (('like' === operator || 'notLike' === operator) && 'string' === typeof comparison.right.value) {
-    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
+    var {
+      sql: _sql,
+      processedPattern: processedPattern
+    } = (0, _unicodeHelpers.createUnicodeLikeExpression)("\"".concat(table, "\".\"").concat(left, "\""), comparison.right.value);
+    var op = 'like' === operator ? 'LIKE' : 'NOT LIKE';
+    return _sql.replace('LIKE', op).replace('?', (0, _encodeValue.default)(processedPattern));
   }
 
-  // For equality comparisons with text, use LOWER() for Unicode support
+  // For equality comparisons with text, use Unicode-aware expressions
   if (('eq' === operator || 'notEq' === operator) && 'string' === typeof comparison.right.value) {
-    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
+    var {
+      sql: _sql2,
+      processedValue: processedValue
+    } = (0, _unicodeHelpers.createUnicodeAwareExpression)("\"".concat(table, "\".\"").concat(left, "\""), operators[operator], comparison.right.value);
+    return _sql2.replace('?', (0, _encodeValue.default)(processedValue));
   }
   return "\"".concat(table, "\".\"").concat(left, "\" ").concat(encodeComparison(table, comparison));
 };
@@ -200,10 +214,10 @@ var encodeQuery = function (query, countMode = false) {
   // TODO: Test if encoding a `select x.id from x` query speeds up queryIds() calls
   if (description.sql) {
     var {
-      sql: _sql,
+      sql: _sql3,
       values: values
     } = description.sql;
-    return [_sql, values];
+    return [_sql3, values];
   }
   var hasToManyJoins = associations.some(function ({
     info: info

@@ -16,6 +16,12 @@ import * as Q from '../../../QueryDescription'
 import { type TableName, type ColumnName } from '../../../Schema'
 
 import encodeValue from '../encodeValue'
+import {
+  createUnicodeAwareExpression,
+  createUnicodeLikeExpression,
+  createUnicodeIncludesExpression,
+  needsUnicodeProcessing
+} from '../unicodeHelpers'
 import type { SQL, SQLiteArg } from '../index'
 
 function mapJoin<T>(array: T[], mapper: (T) => string, joiner: string): string {
@@ -132,18 +138,22 @@ const encodeWhereCondition = (
     ),
     )
   } else if (operator === 'includes') {
-  // Use LOWER() for case-insensitive Unicode search - SQLCipher doesn't support Unicode collations
-  return `instr(LOWER("${table}"."${left}"), ${getComparisonRightLower(table, comparison.right)})`
+  // Use Unicode-aware includes with automatic detection
+  const { sql, processedText } = createUnicodeIncludesExpression(`"${table}"."${left}"`, comparison.right.value || '')
+  return sql.replace('?', encodeValue(processedText))
 }
 
-// For text operations with Unicode support, use LOWER() function
+// For text operations, use Unicode-aware expressions
 if ((operator === 'like' || operator === 'notLike') && typeof comparison.right.value === 'string') {
-  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
+  const { sql, processedPattern } = createUnicodeLikeExpression(`"${table}"."${left}"`, comparison.right.value)
+  const op = operator === 'like' ? 'LIKE' : 'NOT LIKE'
+  return sql.replace('LIKE', op).replace('?', encodeValue(processedPattern))
 }
 
-// For equality comparisons with text, use LOWER() for Unicode support
+// For equality comparisons with text, use Unicode-aware expressions
 if ((operator === 'eq' || operator === 'notEq') && typeof comparison.right.value === 'string') {
-  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
+  const { sql, processedValue } = createUnicodeAwareExpression(`"${table}"."${left}"`, operators[operator], comparison.right.value)
+  return sql.replace('?', encodeValue(processedValue))
 }
 
 return `"${table}"."${left}" ${encodeComparison(table, comparison)}`

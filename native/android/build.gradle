@@ -55,11 +55,18 @@ dependencies {
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getExtOrDefault('kotlinVersion')}"
-    // Needed for encrypted SQLite databases (passphrase option) on Android
-    // Using SQLCipher with ICU support - специальная версия с ICU
+    
+    // Пробуем альтернативные SQLite библиотеки с Unicode поддержкой
+    
+    // Вариант 1: Стандартный SQLCipher (текущий)
     implementation 'net.zetetic:android-database-sqlcipher:4.5.4'
+    
+    // Вариант 2: Добавляем sqlite-android для лучшей Unicode поддержки
+    // implementation 'io.requery:sqlite-android:3.39.2'
+    
     implementation 'androidx.sqlite:sqlite:2.2.0'
-    // Добавляем ICU4J для Unicode поддержки
+    
+    // Добавляем ICU4J для Unicode обработки на Java уровне
     implementation 'com.ibm.icu:icu4j:73.2'
 }
 

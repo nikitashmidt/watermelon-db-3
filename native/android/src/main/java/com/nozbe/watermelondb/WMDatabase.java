@@ -65,59 +65,43 @@ public class WMDatabase {
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
         database.execSQL("PRAGMA encoding = 'UTF-8';");
         
-        // Register custom Unicode functions for SQLCipher
+        // Simple Unicode support test
         try {
             database.execSQL("PRAGMA temp_store = MEMORY;");
             
-            // Регистрируем кастомные Unicode функции
-            CustomCollations.registerCustomCollations(database);
+            android.util.Log.d("WatermelonDB", "🧪 Testing basic Unicode support...");
             
-            // Инициализируем Unicode утилиты
-            UnicodeUtils.normalizeForSearch("тест");
-            
-            android.util.Log.d("WatermelonDB", "🧪 Testing custom Unicode functions...");
-            
-            // Тестируем кастомные функции
+            // Простой тест Unicode поддержки
             try {
                 database.execSQL("CREATE TEMP TABLE unicode_test (text TEXT);");
                 database.execSQL("INSERT INTO unicode_test VALUES ('Тест'), ('тест'), ('ТЕСТ'), ('Test'), ('test'), ('TEST');");
                 
-                // Тест 1: Кастомная UNICODE_LIKE функция
-                android.database.Cursor cursor1 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE UNICODE_LIKE(text, '%тест%') = 1;", null);
-                int count1 = 0;
-                if (cursor1.moveToFirst()) {
-                    count1 = cursor1.getInt(0);
+                // Тест LOWER функции с кириллицей
+                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE LOWER(text) LIKE LOWER('%тест%');", null);
+                int count = 0;
+                if (cursor.moveToFirst()) {
+                    count = cursor.getInt(0);
                 }
-                cursor1.close();
-                
-                // Тест 2: Кастомная UNICODE_LOWER функция
-                android.database.Cursor cursor2 = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE UNICODE_LOWER(text) LIKE UNICODE_LOWER('%тест%');", null);
-                int count2 = 0;
-                if (cursor2.moveToFirst()) {
-                    count2 = cursor2.getInt(0);
-                }
-                cursor2.close();
+                cursor.close();
                 
                 database.execSQL("DROP TABLE unicode_test;");
                 
-                android.util.Log.d("WatermelonDB", "🔍 Custom Unicode function results:");
-                android.util.Log.d("WatermelonDB", "  🎯 UNICODE_LIKE: " + count1 + " matches");
-                android.util.Log.d("WatermelonDB", "  🔤 UNICODE_LOWER: " + count2 + " matches");
+                android.util.Log.d("WatermelonDB", "🔍 LOWER() function test: " + count + " matches for 'тест'");
                 
-                if (count1 >= 3) {
-                    android.util.Log.d("WatermelonDB", "🎉 ПОБЕДА! Custom UNICODE_LIKE works with Cyrillic!");
-                } else if (count2 >= 3) {
-                    android.util.Log.d("WatermelonDB", "🎉 ПОБЕДА! Custom UNICODE_LOWER works with Cyrillic!");
+                if (count >= 3) {
+                    android.util.Log.d("WatermelonDB", "🎉 LOWER() works with Cyrillic - Unicode search should work!");
+                } else if (count >= 1) {
+                    android.util.Log.w("WatermelonDB", "⚠️ LOWER() partially works (" + count + "/3) - may have issues");
                 } else {
-                    android.util.Log.w("WatermelonDB", "⚠️ Custom functions need debugging");
+                    android.util.Log.e("WatermelonDB", "❌ LOWER() doesn't work with Cyrillic - Unicode search won't work");
                 }
                 
             } catch (Exception test) {
-                android.util.Log.w("WatermelonDB", "Custom function test failed: " + test.getMessage());
+                android.util.Log.w("WatermelonDB", "Unicode test failed: " + test.getMessage());
             }
             
         } catch (Exception e) {
-            android.util.Log.w("WatermelonDB", "Failed to register custom functions: " + e.getMessage());
+            android.util.Log.w("WatermelonDB", "Failed to test Unicode support: " + e.getMessage());
         }
         return database;
     }
