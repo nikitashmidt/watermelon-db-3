@@ -32,6 +32,12 @@ android {
         versionCode 1
         versionName "1.0"
     }
+
+    packagingOptions {
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libjsc.so'
+        pickFirst '**/libsqlcipher.so'
+    }
 }
 
 dependencies {
@@ -39,12 +45,20 @@ dependencies {
     implementation 'com.facebook.react:react-native:+'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getExtOrDefault('kotlinVersion')}"
     // Needed for encrypted SQLite databases (passphrase option) on Android
-    // Using version with ICU support for proper Unicode handling
-    implementation 'net.zetetic:android-database-sqlcipher:4.5.4@aar'
-    implementation 'net.zetetic:sqlcipher-android:4.5.4'
+    // Using SQLCipher with ICU support for proper Unicode handling
+    implementation 'net.zetetic:android-database-sqlcipher:4.5.3'
+    // Add androidx.sqlite for compatibility (required for SQLCipher 4.5.x)
+    implementation 'androidx.sqlite:sqlite:2.2.0'
 }
 
 repositories {
     mavenCentral()
+    google()
+    // Add jcenter for SQLCipher if needed
+    jcenter() {
+        content {
+            includeModule("net.zetetic", "android-database-sqlcipher")
+        }
+    }
 }
 
