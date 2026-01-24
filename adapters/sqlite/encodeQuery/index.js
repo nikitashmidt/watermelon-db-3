@@ -46,7 +46,7 @@ var getComparisonRightLower = function (table, comparisonRight) {
 
 // Note: it's necessary to use `is` / `is not` for NULL comparisons to work correctly
 // See: https://sqlite.org/lang_expr.html
-// For Unicode support, we use Android LOCALIZED collation which supports Cyrillic properly
+// SQLCipher doesn't support Unicode collations properly, so we use LOWER() functions
 var operators = {
   eq: 'is',
   notEq: 'is not',
@@ -59,8 +59,8 @@ var operators = {
   oneOf: 'in',
   notIn: 'not in',
   between: 'between',
-  like: 'like COLLATE LOCALIZED',
-  notLike: 'not like COLLATE LOCALIZED'
+  like: 'like',
+  notLike: 'not like'
 };
 var encodeComparison = function (table, comparison) {
   var {
@@ -110,18 +110,18 @@ var encodeWhereCondition = function (associations, table, left, comparison) {
     // $FlowFixMe
     Q.where(left, Q.gt(Q.column(comparison.right.column))), Q.and(Q.where(left, Q.notEq(null)), Q.where(comparison.right.column, null))));
   } else if ('includes' === operator) {
-    // Use Android LOCALIZED collation for case-insensitive Unicode search
-    return "instr(\"".concat(table, "\".\"").concat(left, "\" COLLATE LOCALIZED, ").concat(getComparisonRight(table, comparison.right), " COLLATE LOCALIZED)");
+    // Use LOWER() for case-insensitive Unicode search - SQLCipher doesn't support Unicode collations
+    return "instr(LOWER(\"".concat(table, "\".\"").concat(left, "\"), ").concat(getComparisonRightLower(table, comparison.right), ")");
   }
 
-  // For text operations with Unicode support, use LOCALIZED collation
+  // For text operations with Unicode support, use LOWER() function
   if (('like' === operator || 'notLike' === operator) && 'string' === typeof comparison.right.value) {
-    return "\"".concat(table, "\".\"").concat(left, "\" COLLATE LOCALIZED ").concat(operators[operator]);
+    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
   }
 
-  // For equality comparisons with text, use LOCALIZED collation for Unicode support
+  // For equality comparisons with text, use LOWER() for Unicode support
   if (('eq' === operator || 'notEq' === operator) && 'string' === typeof comparison.right.value) {
-    return "\"".concat(table, "\".\"").concat(left, "\" COLLATE LOCALIZED ").concat(operators[operator], " ").concat(getComparisonRight(table, comparison.right), " COLLATE LOCALIZED");
+    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
   }
   return "\"".concat(table, "\".\"").concat(left, "\" ").concat(encodeComparison(table, comparison));
 };

@@ -58,7 +58,7 @@ const getComparisonRightLower = (table: TableName<any>, comparisonRight: Compari
 
 // Note: it's necessary to use `is` / `is not` for NULL comparisons to work correctly
 // See: https://sqlite.org/lang_expr.html
-// For Unicode support, we use Android LOCALIZED collation which supports Cyrillic properly
+// SQLCipher doesn't support Unicode collations properly, so we use LOWER() functions
 const operators: { [Operator]: string } = {
   eq: 'is',
   notEq: 'is not',
@@ -70,8 +70,8 @@ const operators: { [Operator]: string } = {
   oneOf: 'in',
   notIn: 'not in',
   between: 'between',
-  like: 'like COLLATE LOCALIZED',
-  notLike: 'not like COLLATE LOCALIZED',
+  like: 'like',
+  notLike: 'not like',
 }
 
 const encodeComparison = (table: TableName<any>, comparison: Comparison) => {
@@ -132,18 +132,18 @@ const encodeWhereCondition = (
     ),
     )
   } else if (operator === 'includes') {
-  // Use Android LOCALIZED collation for case-insensitive Unicode search
-  return `instr("${table}"."${left}" COLLATE LOCALIZED, ${getComparisonRight(table, comparison.right)} COLLATE LOCALIZED)`
+  // Use LOWER() for case-insensitive Unicode search - SQLCipher doesn't support Unicode collations
+  return `instr(LOWER("${table}"."${left}"), ${getComparisonRightLower(table, comparison.right)})`
 }
 
-// For text operations with Unicode support, use LOCALIZED collation
+// For text operations with Unicode support, use LOWER() function
 if ((operator === 'like' || operator === 'notLike') && typeof comparison.right.value === 'string') {
-  return `"${table}"."${left}" COLLATE LOCALIZED ${operators[operator]}`
+  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
 }
 
-// For equality comparisons with text, use LOCALIZED collation for Unicode support
+// For equality comparisons with text, use LOWER() for Unicode support
 if ((operator === 'eq' || operator === 'notEq') && typeof comparison.right.value === 'string') {
-  return `"${table}"."${left}" COLLATE LOCALIZED ${operators[operator]} ${getComparisonRight(table, comparison.right)} COLLATE LOCALIZED`
+  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
 }
 
 return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
