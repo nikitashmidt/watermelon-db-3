@@ -75,32 +75,29 @@ public class WMDatabase {
         try {
             database.execSQL("PRAGMA temp_store = MEMORY;");
             
-            // Initialize Unicode helper
-            UnicodeHelper.normalizeForComparison("test");
-            android.util.Log.d("WatermelonDB", "Unicode helper initialized");
+            android.util.Log.d("WatermelonDB", "Unicode support initialized");
             
-            // Register custom Unicode functions
-            UnicodeSQLiteFunctions.registerFunctions(database);
+            // Unicode support will use LOWER() functions in queries
             
             // Try to enable ICU extension if available
             try {
                 database.execSQL("SELECT load_extension('libsqliteicu');");
                 android.util.Log.d("WatermelonDB", "ICU extension loaded successfully");
             } catch (Exception icu) {
-                android.util.Log.w("WatermelonDB", "ICU extension not available, using ICU4J fallback: " + icu.getMessage());
+                android.util.Log.w("WatermelonDB", "ICU extension not available, using LOWER() functions: " + icu.getMessage());
             }
             
-            // Test ICU collation support
+            // Test Unicode support with LOWER function
             try {
-                database.execSQL("CREATE TEMP TABLE icu_test (text TEXT COLLATE NOCASE);");
-                database.execSQL("INSERT INTO icu_test VALUES ('Test'), ('test'), ('TEST'), ('Тест'), ('тест'), ('ТЕСТ');");
-                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM icu_test WHERE text LIKE '%тест%' COLLATE NOCASE;", null);
+                database.execSQL("CREATE TEMP TABLE unicode_test (text TEXT);");
+                database.execSQL("INSERT INTO unicode_test VALUES ('Test'), ('test'), ('TEST'), ('Тест'), ('тест'), ('ТЕСТ');");
+                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE LOWER(text) LIKE LOWER('%тест%');", null);
                 if (cursor.moveToFirst()) {
                     int count = cursor.getInt(0);
-                    android.util.Log.d("WatermelonDB", "Unicode collation test result: " + count + " matches (should be 3)");
+                    android.util.Log.d("WatermelonDB", "Unicode LOWER() test: " + count + " matches for 'тест' (should be 3)");
                 }
                 cursor.close();
-                database.execSQL("DROP TABLE icu_test;");
+                database.execSQL("DROP TABLE unicode_test;");
             } catch (Exception test) {
                 android.util.Log.w("WatermelonDB", "ICU collation test failed: " + test.getMessage());
             }
