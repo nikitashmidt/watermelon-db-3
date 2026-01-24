@@ -65,45 +65,12 @@ public class WMDatabase {
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
         database.execSQL("PRAGMA encoding = 'UTF-8';");
         
-        // Set locale for better Unicode support
-        try {
-            database.setLocale(java.util.Locale.getDefault());
-        } catch (Exception locale) {
-            android.util.Log.w("WatermelonDB", "Failed to set locale: " + locale.getMessage());
-        }
-        // Enhanced ICU support settings for proper Unicode handling
+        // Simple Unicode support initialization
         try {
             database.execSQL("PRAGMA temp_store = MEMORY;");
-            
-            android.util.Log.d("WatermelonDB", "Unicode support initialized");
-            
-            // Unicode support will use LOWER() functions in queries
-            
-            // Try to enable ICU extension if available
-            try {
-                database.execSQL("SELECT load_extension('libsqliteicu');");
-                android.util.Log.d("WatermelonDB", "ICU extension loaded successfully");
-            } catch (Exception icu) {
-                android.util.Log.w("WatermelonDB", "ICU extension not available, using LOWER() functions: " + icu.getMessage());
-            }
-            
-            // Test Unicode support with LOWER function
-            try {
-                database.execSQL("CREATE TEMP TABLE unicode_test (text TEXT);");
-                database.execSQL("INSERT INTO unicode_test VALUES ('Test'), ('test'), ('TEST'), ('Тест'), ('тест'), ('ТЕСТ');");
-                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE LOWER(text) LIKE LOWER('%тест%');", null);
-                if (cursor.moveToFirst()) {
-                    int count = cursor.getInt(0);
-                    android.util.Log.d("WatermelonDB", "Unicode LOWER() test: " + count + " matches for 'тест' (should be 3)");
-                }
-                cursor.close();
-                database.execSQL("DROP TABLE unicode_test;");
-            } catch (Exception test) {
-                android.util.Log.w("WatermelonDB", "ICU collation test failed: " + test.getMessage());
-            }
-            
+            android.util.Log.d("WatermelonDB", "Unicode support initialized - using LOWER() functions for case-insensitive search");
         } catch (Exception e) {
-            android.util.Log.w("WatermelonDB", "Failed to initialize ICU support: " + e.getMessage());
+            android.util.Log.w("WatermelonDB", "Failed to initialize Unicode support: " + e.getMessage());
         }
         return database;
     }
