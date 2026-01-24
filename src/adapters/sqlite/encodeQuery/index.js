@@ -16,12 +16,6 @@ import * as Q from '../../../QueryDescription'
 import { type TableName, type ColumnName } from '../../../Schema'
 
 import encodeValue from '../encodeValue'
-import {
-  createUnicodeAwareExpression,
-  createUnicodeLikeExpression,
-  createUnicodeIncludesExpression,
-  needsUnicodeProcessing
-} from '../unicodeHelpers'
 import type { SQL, SQLiteArg } from '../index'
 
 function mapJoin<T>(array: T[], mapper: (T) => string, joiner: string): string {
@@ -43,28 +37,8 @@ const getComparisonRight = (table: TableName<any>, comparisonRight: ComparisonRi
   return typeof comparisonRight.value !== 'undefined' ? encodeValue(comparisonRight.value) : 'null'
 }
 
-// Helper function to get comparison right value with LOWER() for text operations
-const getComparisonRightLower = (table: TableName<any>, comparisonRight: ComparisonRight): string => {
-  if (comparisonRight.values) {
-    // For values array, apply LOWER to each string value
-    const lowerValues = (comparisonRight.values: any[]).map(val =>
-      typeof val === 'string' ? val.toLowerCase() : val
-    )
-    return encodeValues(lowerValues)
-  } else if (comparisonRight.column) {
-    return `LOWER("${table}"."${comparisonRight.column}")`
-  }
-
-  const value = comparisonRight.value
-  if (typeof value === 'string') {
-    return encodeValue(value.toLowerCase())
-  }
-  return typeof value !== 'undefined' ? encodeValue(value) : 'null'
-}
-
 // Note: it's necessary to use `is` / `is not` for NULL comparisons to work correctly
 // See: https://sqlite.org/lang_expr.html
-// SQLCipher doesn't support Unicode collations properly, so we use LOWER() functions
 const operators: { [Operator]: string } = {
   eq: 'is',
   notEq: 'is not',
@@ -94,28 +68,28 @@ const encodeComparison = (table: TableName<any>, comparison: Comparison) => {
 
 const encodeWhere =
   (table: TableName<any>, associations: QueryAssociation[]) =>
-    (where: Where): string => {
-      switch (where.type) {
-        case 'and':
-          return `(${encodeAndOr(associations, 'and', table, where.conditions)})`
-        case 'or':
-          return `(${encodeAndOr(associations, 'or', table, where.conditions)})`
-        case 'where':
-          return encodeWhereCondition(associations, table, where.left, where.comparison)
-        case 'on':
-          if (process.env.NODE_ENV !== 'production') {
-            invariant(
-              associations.some(({ to }) => to === where.table),
-              'To nest Q.on inside Q.and/Q.or you must explicitly declare Q.experimentalJoinTables at the beginning of the query',
-            )
-          }
-          return `(${encodeAndOr(associations, 'and', where.table, where.conditions)})`
-        case 'sql':
-          return where.expr
-        default:
-          throw new Error(`Unknown clause ${where.type}`)
-      }
+  (where: Where): string => {
+    switch (where.type) {
+      case 'and':
+        return `(${encodeAndOr(associations, 'and', table, where.conditions)})`
+      case 'or':
+        return `(${encodeAndOr(associations, 'or', table, where.conditions)})`
+      case 'where':
+        return encodeWhereCondition(associations, table, where.left, where.comparison)
+      case 'on':
+        if (process.env.NODE_ENV !== 'production') {
+          invariant(
+            associations.some(({ to }) => to === where.table),
+            'To nest Q.on inside Q.and/Q.or you must explicitly declare Q.experimentalJoinTables at the beginning of the query',
+          )
+        }
+        return `(${encodeAndOr(associations, 'and', where.table, where.conditions)})`
+      case 'sql':
+        return where.expr
+      default:
+        throw new Error(`Unknown clause ${where.type}`)
     }
+  }
 
 const encodeWhereCondition = (
   associations: QueryAssociation[],
@@ -135,28 +109,13 @@ const encodeWhereCondition = (
         // $FlowFixMe
         Q.where(left, Q.gt(Q.column(comparison.right.column))),
         Q.and(Q.where(left, Q.notEq(null)), Q.where((comparison.right: any).column, null)),
-    ),
+      ),
     )
   } else if (operator === 'includes') {
-  // Use Unicode-aware includes with automatic detection
-  const { sql, processedText } = createUnicodeIncludesExpression(`"${table}"."${left}"`, comparison.right.value || '')
-  return sql.replace('?', encodeValue(processedText))
-}
+    return `instr("${table}"."${left}", ${getComparisonRight(table, comparison.right)})`
+  }
 
-// For text operations, use Unicode-aware expressions
-if ((operator === 'like' || operator === 'notLike') && typeof comparison.right.value === 'string') {
-  const { sql, processedPattern } = createUnicodeLikeExpression(`"${table}"."${left}"`, comparison.right.value)
-  const op = operator === 'like' ? 'LIKE' : 'NOT LIKE'
-  return sql.replace('LIKE', op).replace('?', encodeValue(processedPattern))
-}
-
-// For equality comparisons with text, use Unicode-aware expressions
-if ((operator === 'eq' || operator === 'notEq') && typeof comparison.right.value === 'string') {
-  const { sql, processedValue } = createUnicodeAwareExpression(`"${table}"."${left}"`, operators[operator], comparison.right.value)
-  return sql.replace('?', encodeValue(processedValue))
-}
-
-return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
+  return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
 }
 
 const encodeAndOr = (
@@ -203,28 +162,28 @@ const encodeMethod = (
 
 const encodeAssociation =
   (description: QueryDescription) =>
-    ({ from: mainTable, to: joinedTable, info: association }: QueryAssociation): string => {
-      // TODO: We have a problem here. For all of eternity, WatermelonDB Q.ons were encoded using JOIN
-      // However, this precludes many legitimate use cases for Q.ons once you start nesting them
-      // (e.g. get tasks where X or has a tag assignment that Y -- if there is no tag assignment, this will
-      // fail to join)
-      // LEFT JOIN needs to be used to address this… BUT technically that's a breaking change. I never
-      // considered a possiblity of making a query like `Q.on(relation_id, x != 'bla')`. Before this would
-      // only match if there IS a relation, but with LEFT JOIN it would also match if record does not have
-      // this relation. I don't know if there are legitimate use cases where this would change anything
-      // so I need more time to think about whether this breaking change is OK to make or if we need to
-      // do something more clever/add option/whatever.
-      // so for now, i'm making an extreeeeemelyyyy bad hack to make sure that there's no breaking change
-      // for existing code and code with nested Q.ons probably works (with caveats)
-      const usesOldJoinStyle = description.where.some(
-        (clause) => clause.type === 'on' && clause.table === joinedTable,
-      )
-      const joinKeyword = usesOldJoinStyle ? ' join ' : ' left join '
-      const joinBeginning = `${joinKeyword}"${joinedTable}" on "${joinedTable}".`
-      return association.type === 'belongs_to'
-        ? `${joinBeginning}"id" = "${mainTable}"."${association.key}"`
-        : `${joinBeginning}"${association.foreignKey}" = "${mainTable}"."id"`
-    }
+  ({ from: mainTable, to: joinedTable, info: association }: QueryAssociation): string => {
+    // TODO: We have a problem here. For all of eternity, WatermelonDB Q.ons were encoded using JOIN
+    // However, this precludes many legitimate use cases for Q.ons once you start nesting them
+    // (e.g. get tasks where X or has a tag assignment that Y -- if there is no tag assignment, this will
+    // fail to join)
+    // LEFT JOIN needs to be used to address this… BUT technically that's a breaking change. I never
+    // considered a possiblity of making a query like `Q.on(relation_id, x != 'bla')`. Before this would
+    // only match if there IS a relation, but with LEFT JOIN it would also match if record does not have
+    // this relation. I don't know if there are legitimate use cases where this would change anything
+    // so I need more time to think about whether this breaking change is OK to make or if we need to
+    // do something more clever/add option/whatever.
+    // so for now, i'm making an extreeeeemelyyyy bad hack to make sure that there's no breaking change
+    // for existing code and code with nested Q.ons probably works (with caveats)
+    const usesOldJoinStyle = description.where.some(
+      (clause) => clause.type === 'on' && clause.table === joinedTable,
+    )
+    const joinKeyword = usesOldJoinStyle ? ' join ' : ' left join '
+    const joinBeginning = `${joinKeyword}"${joinedTable}" on "${joinedTable}".`
+    return association.type === 'belongs_to'
+      ? `${joinBeginning}"id" = "${mainTable}"."${association.key}"`
+      : `${joinBeginning}"${association.foreignKey}" = "${mainTable}"."id"`
+  }
 
 const encodeJoin = (description: QueryDescription, associations: QueryAssociation[]): string =>
   associations.length ? associations.map(encodeAssociation(description)).join('') : ''

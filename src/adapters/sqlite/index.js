@@ -34,7 +34,6 @@ import type {
 } from './type'
 
 import encodeQuery from './encodeQuery'
-import { enableICUSupport } from './icuSupport'
 
 import { makeDispatcher, getDispatcherType } from './makeDispatcher'
 
@@ -210,12 +209,6 @@ export default class SQLiteAdapter implements DatabaseAdapter {
       (result) => {
         if (!result.error) {
           logger.log(`[SQLite] Schema set up successfully`)
-          // Initialize ICU support for Unicode handling
-          try {
-            enableICUSupport(this._dispatcher)
-          } catch (error) {
-            logger.warn('[SQLite] Failed to initialize ICU support:', error.message)
-          }
         }
         callback(result)
       },
@@ -355,9 +348,9 @@ export default class SQLiteAdapter implements DatabaseAdapter {
     if (process.env.NODE_ENV !== 'production') {
       invariant(
         operations &&
-        typeof operations === 'object' &&
-        Object.keys(operations).length === 1 &&
-        (Array.isArray(operations.sqls) || typeof operations.sqlString === 'string'),
+          typeof operations === 'object' &&
+          Object.keys(operations).length === 1 &&
+          (Array.isArray(operations.sqls) || typeof operations.sqlString === 'string'),
         "unsafeExecute expects an { sqls: [ [sql, [args..]], ... ] } or { sqlString: 'foo; bar' } object",
       )
     }

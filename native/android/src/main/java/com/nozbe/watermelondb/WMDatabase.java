@@ -62,47 +62,9 @@ public class WMDatabase {
         if (enableWriteAheadLogging) {
             database.enableWriteAheadLogging();
         }
-        database.execSQL("PRAGMA case_sensitive_like=OFF;");
-        database.execSQL("PRAGMA encoding = 'UTF-8';");
-        
-        // Simple Unicode support test
-        try {
-            database.execSQL("PRAGMA temp_store = MEMORY;");
-            
-            android.util.Log.d("WatermelonDB", "🧪 Testing basic Unicode support...");
-            
-            // Простой тест Unicode поддержки
-            try {
-                database.execSQL("CREATE TEMP TABLE unicode_test (text TEXT);");
-                database.execSQL("INSERT INTO unicode_test VALUES ('Тест'), ('тест'), ('ТЕСТ'), ('Test'), ('test'), ('TEST');");
-                
-                // Тест LOWER функции с кириллицей
-                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM unicode_test WHERE LOWER(text) LIKE LOWER('%тест%');", null);
-                int count = 0;
-                if (cursor.moveToFirst()) {
-                    count = cursor.getInt(0);
-                }
-                cursor.close();
-                
-                database.execSQL("DROP TABLE unicode_test;");
-                
-                android.util.Log.d("WatermelonDB", "🔍 LOWER() function test: " + count + " matches for 'тест'");
-                
-                if (count >= 3) {
-                    android.util.Log.d("WatermelonDB", "🎉 LOWER() works with Cyrillic - Unicode search should work!");
-                } else if (count >= 1) {
-                    android.util.Log.w("WatermelonDB", "⚠️ LOWER() partially works (" + count + "/3) - may have issues");
-                } else {
-                    android.util.Log.e("WatermelonDB", "❌ LOWER() doesn't work with Cyrillic - Unicode search won't work");
-                }
-                
-            } catch (Exception test) {
-                android.util.Log.w("WatermelonDB", "Unicode test failed: " + test.getMessage());
-            }
-            
-        } catch (Exception e) {
-            android.util.Log.w("WatermelonDB", "Failed to test Unicode support: " + e.getMessage());
-        }
+        database.execSQL("SELECT load_extension('libsqliteicu.so');");
+        database.execSQL("PRAGMA case_sensitive_like = OFF;");
+        database.execSQL("SELECT icu_load_collation('ru_RU', 'russian');");
         return database;
     }
 
