@@ -60,13 +60,11 @@ public class WMDatabase {
         }
         String safePassword = password == null ? "" : password;
 
-        // НОВОЕ ИЗМЕНЕНИЕ: Явно загружаем нативную библиотеку ICU
         try {
             System.loadLibrary("sqlcipher_android_icu");
             Log.d("WMDatabase", "Loaded sqlcipher_android_icu library.");
         } catch (UnsatisfiedLinkError e) {
             Log.e("WMDatabase", "Failed to load sqlcipher_android_icu library. ICU collation will not be available.", e);
-            // Возможно, здесь можно fallback на ASCII-only режим, но пока просто логируем
         }
 
         SQLiteDatabase.loadLibs(context);
@@ -82,7 +80,21 @@ public class WMDatabase {
                     database.execSQL("SELECT icu_load_collation('UNICODE_NOCASE', 'UTF8');");
                     Log.d("WMDatabase", "ICU collation 'UNICODE_NOCASE' loaded successfully.");
                 } catch (Exception e) {
-                    Log.e("WMDatabase", "Failed to load ICU collation 'UNICODE_NOCASE'", e);
+                    Log.e("WMDatabase", "Failed to load ICU collation 'UNICODE_NOCASE'. Error: " + e.getMessage());
+                    try (Cursor functionsCursor = database.rawQuery("PRAGMA function_list;", null)) {
+                        if (functionsCursor != null && functionsCursor.moveToFirst()) {
+                            StringBuilder functions = new StringBuilder("Available SQL functions: ");
+                            do {
+                                int nameIndex = functionsCursor.getColumnIndex("name");
+                                if (nameIndex >= 0) {
+                                    functions.append(functionsCursor.getString(nameIndex)).append(", ");
+                                }
+                            } while (functionsCursor.moveToNext());
+                            Log.e("WMDatabase", functions.toString());
+                        }
+                    } catch (Exception functionsException) {
+                        Log.e("WMDatabase", "Failed to list SQL functions: " + functionsException.getMessage());
+                    }
                 }
             }
         };
@@ -126,6 +138,7 @@ public class WMDatabase {
     }
 
     public Cursor rawQuery(String sql, Object[] args) {
+        Log.d("WMDatabase", "Executing SQL: " + sql);
         String[] rawArgs = new String[args.length];
         Arrays.fill(rawArgs, "");
         return db.rawQueryWithFactory(
@@ -192,7 +205,7 @@ public class WMDatabase {
                 if (nameIndex > -1) {
                     do {
                         allTables.add(cursor.getString(nameIndex));
-                    } while (cursor.moveToNext());
+                    } while (functionsCursor.moveToNext());
                 }
             }
         }
