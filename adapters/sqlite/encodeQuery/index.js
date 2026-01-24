@@ -40,8 +40,8 @@ var operators = {
   oneOf: 'in',
   notIn: 'not in',
   between: 'between',
-  like: 'like',
-  notLike: 'not like'
+  like: 'like COLLATE NOCASE',
+  notLike: 'not like COLLATE NOCASE'
 };
 var encodeComparison = function (table, comparison) {
   var {
@@ -91,7 +91,13 @@ var encodeWhereCondition = function (associations, table, left, comparison) {
     // $FlowFixMe
     Q.where(left, Q.gt(Q.column(comparison.right.column))), Q.and(Q.where(left, Q.notEq(null)), Q.where(comparison.right.column, null))));
   } else if ('includes' === operator) {
-    return "instr(\"".concat(table, "\".\"").concat(left, "\", ").concat(getComparisonRight(table, comparison.right), ")");
+    // Use COLLATE NOCASE for case-insensitive Unicode search
+    return "instr(\"".concat(table, "\".\"").concat(left, "\" COLLATE NOCASE, ").concat(getComparisonRight(table, comparison.right), " COLLATE NOCASE)");
+  }
+
+  // For equality comparisons with text, use COLLATE NOCASE for Unicode support
+  if (('eq' === operator || 'notEq' === operator) && 'string' === typeof comparison.right.value) {
+    return "\"".concat(table, "\".\"").concat(left, "\" COLLATE NOCASE ").concat(encodeComparison(table, comparison));
   }
   return "\"".concat(table, "\".\"").concat(left, "\" ").concat(encodeComparison(table, comparison));
 };

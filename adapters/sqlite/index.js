@@ -10,6 +10,7 @@ var _Result = require("../../utils/fp/Result");
 var _fp = require("../../utils/fp");
 var _common2 = require("../common");
 var _encodeQuery = _interopRequireDefault(require("./encodeQuery"));
+var _icuSupport = require("./icuSupport");
 var _makeDispatcher = require("./makeDispatcher");
 /* eslint-disable global-require */
 if ('production' !== process.env.NODE_ENV) {
@@ -138,25 +139,32 @@ var SQLiteAdapter = exports.default = /*#__PURE__*/function () {
     }
   };
   _proto._setUpWithSchema = function (callback) {
+    var _this4 = this;
     _common.logger.log("[SQLite] Setting up database with schema version ".concat(this.schema.version));
     this._dispatcher.call('setUpWithSchema', [this.dbName, this._encodedSchema(), this.schema.version], function (result) {
       if (!result.error) {
         _common.logger.log("[SQLite] Schema set up successfully");
+        // Initialize ICU support for Unicode handling
+        try {
+          (0, _icuSupport.enableICUSupport)(_this4._dispatcher);
+        } catch (error) {
+          _common.logger.warn('[SQLite] Failed to initialize ICU support:', error.message);
+        }
       }
       callback(result);
     });
   };
   _proto.find = function (table, id, callback) {
-    var _this4 = this;
+    var _this5 = this;
     (0, _common2.validateTable)(table, this.schema);
     this._dispatcher.call('find', [table, id], function (result) {
       return callback((0, _Result.mapValue)(function (rawRecord) {
-        return (0, _common2.sanitizeFindResult)(rawRecord, _this4.schema.tables[table]);
+        return (0, _common2.sanitizeFindResult)(rawRecord, _this5.schema.tables[table]);
       }, result));
     });
   };
   _proto.query = function (_query, callback) {
-    var _this5 = this;
+    var _this6 = this;
     (0, _common2.validateTable)(_query.table, this.schema);
     var {
       table: table
@@ -164,7 +172,7 @@ var SQLiteAdapter = exports.default = /*#__PURE__*/function () {
     var [sql, args] = (0, _encodeQuery.default)(_query);
     this._dispatcher.call('query', [table, sql, args], function (result) {
       return callback((0, _Result.mapValue)(function (rawRecords) {
-        return (0, _common2.sanitizeQueryResult)(rawRecords, _this5.schema.tables[table]);
+        return (0, _common2.sanitizeQueryResult)(rawRecords, _this6.schema.tables[table]);
       }, result));
     });
   };

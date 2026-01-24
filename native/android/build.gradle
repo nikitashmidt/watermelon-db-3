@@ -39,7 +39,9 @@ dependencies {
     implementation 'com.facebook.react:react-native:+'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getExtOrDefault('kotlinVersion')}"
     // Needed for encrypted SQLite databases (passphrase option) on Android
-    implementation 'net.zetetic:android-database-sqlcipher:4.5.3'
+    // Using version with ICU support for proper Unicode handling
+    implementation 'net.zetetic:android-database-sqlcipher:4.5.4@aar'
+    implementation 'net.zetetic:sqlcipher-android:4.5.4'
 }
 
 repositories {

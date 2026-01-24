@@ -36,14 +36,18 @@ Pod::Spec.new do |s|
 
   # s.libraries = 'sqlite3'
   if isEncryptedDB
-    print "Using encrypted DB\n"
+    print "Using encrypted DB with ICU support\n"
     s.xcconfig = {
-      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) SQLITE_HAS_CODEC=1',
-      'OTHER_CFLAGS' => '$(inherited) -DSQLITE_HAS_CODEC=1 -DSQLITE_TEMP_STORE=2',
+      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) SQLITE_HAS_CODEC=1 SQLITE_ENABLE_ICU=1',
+      'OTHER_CFLAGS' => '$(inherited) -DSQLITE_HAS_CODEC=1 -DSQLITE_TEMP_STORE=2 -DSQLITE_ENABLE_ICU=1',
     }
     s.dependency "SQLCipher"
   else
     s.libraries = "sqlite3"
+    s.xcconfig = {
+      'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) SQLITE_ENABLE_ICU=1',
+      'OTHER_CFLAGS' => '$(inherited) -DSQLITE_ENABLE_ICU=1',
+    }
   end
 
 
