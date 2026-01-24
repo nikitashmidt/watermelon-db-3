@@ -26,8 +26,27 @@ var getComparisonRight = function (table, comparisonRight) {
   return 'undefined' !== typeof comparisonRight.value ? (0, _encodeValue.default)(comparisonRight.value) : 'null';
 };
 
+// Helper function to get comparison right value with LOWER() for text operations
+var getComparisonRightLower = function (table, comparisonRight) {
+  if (comparisonRight.values) {
+    // For values array, apply LOWER to each string value
+    var lowerValues = comparisonRight.values.map(function (val) {
+      return 'string' === typeof val ? val.toLowerCase() : val;
+    });
+    return encodeValues(lowerValues);
+  } else if (comparisonRight.column) {
+    return "LOWER(\"".concat(table, "\".\"").concat(comparisonRight.column, "\")");
+  }
+  var value = comparisonRight.value;
+  if ('string' === typeof value) {
+    return (0, _encodeValue.default)(value.toLowerCase());
+  }
+  return 'undefined' !== typeof value ? (0, _encodeValue.default)(value) : 'null';
+};
+
 // Note: it's necessary to use `is` / `is not` for NULL comparisons to work correctly
 // See: https://sqlite.org/lang_expr.html
+// For Unicode support, we use LOWER() function instead of COLLATE NOCASE for better Cyrillic support
 var operators = {
   eq: 'is',
   notEq: 'is not',
@@ -40,8 +59,8 @@ var operators = {
   oneOf: 'in',
   notIn: 'not in',
   between: 'between',
-  like: 'like COLLATE NOCASE',
-  notLike: 'not like COLLATE NOCASE'
+  like: 'like',
+  notLike: 'not like'
 };
 var encodeComparison = function (table, comparison) {
   var {
@@ -91,13 +110,18 @@ var encodeWhereCondition = function (associations, table, left, comparison) {
     // $FlowFixMe
     Q.where(left, Q.gt(Q.column(comparison.right.column))), Q.and(Q.where(left, Q.notEq(null)), Q.where(comparison.right.column, null))));
   } else if ('includes' === operator) {
-    // Use COLLATE NOCASE for case-insensitive Unicode search
-    return "instr(\"".concat(table, "\".\"").concat(left, "\" COLLATE NOCASE, ").concat(getComparisonRight(table, comparison.right), " COLLATE NOCASE)");
+    // Use LOWER() for case-insensitive Unicode search (better than COLLATE NOCASE for Cyrillic)
+    return "instr(LOWER(\"".concat(table, "\".\"").concat(left, "\"), ").concat(getComparisonRightLower(table, comparison.right), ")");
   }
 
-  // For equality comparisons with text, use COLLATE NOCASE for Unicode support
+  // For text operations with Unicode support, use LOWER() function
+  if (('like' === operator || 'notLike' === operator) && 'string' === typeof comparison.right.value) {
+    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
+  }
+
+  // For equality comparisons with text, use LOWER() for Unicode support
   if (('eq' === operator || 'notEq' === operator) && 'string' === typeof comparison.right.value) {
-    return "\"".concat(table, "\".\"").concat(left, "\" COLLATE NOCASE ").concat(encodeComparison(table, comparison));
+    return "LOWER(\"".concat(table, "\".\"").concat(left, "\") ").concat(operators[operator], " ").concat(getComparisonRightLower(table, comparison.right));
   }
   return "\"".concat(table, "\".\"").concat(left, "\" ").concat(encodeComparison(table, comparison));
 };

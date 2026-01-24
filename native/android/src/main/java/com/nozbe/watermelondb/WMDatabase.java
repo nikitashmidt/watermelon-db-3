@@ -64,11 +64,49 @@ public class WMDatabase {
         }
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
         database.execSQL("PRAGMA encoding = 'UTF-8';");
-        // Additional ICU support settings
+        
+        // Set locale for better Unicode support
+        try {
+            database.setLocale(java.util.Locale.getDefault());
+        } catch (Exception locale) {
+            android.util.Log.w("WatermelonDB", "Failed to set locale: " + locale.getMessage());
+        }
+        // Enhanced ICU support settings for proper Unicode handling
         try {
             database.execSQL("PRAGMA temp_store = MEMORY;");
+            
+            // Initialize Unicode helper
+            UnicodeHelper.normalizeForComparison("test");
+            android.util.Log.d("WatermelonDB", "Unicode helper initialized");
+            
+            // Register custom Unicode functions
+            UnicodeSQLiteFunctions.registerFunctions(database);
+            
+            // Try to enable ICU extension if available
+            try {
+                database.execSQL("SELECT load_extension('libsqliteicu');");
+                android.util.Log.d("WatermelonDB", "ICU extension loaded successfully");
+            } catch (Exception icu) {
+                android.util.Log.w("WatermelonDB", "ICU extension not available, using ICU4J fallback: " + icu.getMessage());
+            }
+            
+            // Test ICU collation support
+            try {
+                database.execSQL("CREATE TEMP TABLE icu_test (text TEXT COLLATE NOCASE);");
+                database.execSQL("INSERT INTO icu_test VALUES ('Test'), ('test'), ('TEST'), ('Тест'), ('тест'), ('ТЕСТ');");
+                android.database.Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM icu_test WHERE text LIKE '%тест%' COLLATE NOCASE;", null);
+                if (cursor.moveToFirst()) {
+                    int count = cursor.getInt(0);
+                    android.util.Log.d("WatermelonDB", "Unicode collation test result: " + count + " matches (should be 3)");
+                }
+                cursor.close();
+                database.execSQL("DROP TABLE icu_test;");
+            } catch (Exception test) {
+                android.util.Log.w("WatermelonDB", "ICU collation test failed: " + test.getMessage());
+            }
+            
         } catch (Exception e) {
-            // Ignore if not supported
+            android.util.Log.w("WatermelonDB", "Failed to initialize ICU support: " + e.getMessage());
         }
         return database;
     }

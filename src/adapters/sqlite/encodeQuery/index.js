@@ -37,8 +37,28 @@ const getComparisonRight = (table: TableName<any>, comparisonRight: ComparisonRi
   return typeof comparisonRight.value !== 'undefined' ? encodeValue(comparisonRight.value) : 'null'
 }
 
+// Helper function to get comparison right value with LOWER() for text operations
+const getComparisonRightLower = (table: TableName<any>, comparisonRight: ComparisonRight): string => {
+  if (comparisonRight.values) {
+    // For values array, apply LOWER to each string value
+    const lowerValues = (comparisonRight.values: any[]).map(val =>
+      typeof val === 'string' ? val.toLowerCase() : val
+    )
+    return encodeValues(lowerValues)
+  } else if (comparisonRight.column) {
+    return `LOWER("${table}"."${comparisonRight.column}")`
+  }
+
+  const value = comparisonRight.value
+  if (typeof value === 'string') {
+    return encodeValue(value.toLowerCase())
+  }
+  return typeof value !== 'undefined' ? encodeValue(value) : 'null'
+}
+
 // Note: it's necessary to use `is` / `is not` for NULL comparisons to work correctly
 // See: https://sqlite.org/lang_expr.html
+// For Unicode support, we use LOWER() function instead of COLLATE NOCASE for better Cyrillic support
 const operators: { [Operator]: string } = {
   eq: 'is',
   notEq: 'is not',
@@ -50,8 +70,8 @@ const operators: { [Operator]: string } = {
   oneOf: 'in',
   notIn: 'not in',
   between: 'between',
-  like: 'like COLLATE NOCASE',
-  notLike: 'not like COLLATE NOCASE',
+  like: 'like',
+  notLike: 'not like',
 }
 
 const encodeComparison = (table: TableName<any>, comparison: Comparison) => {
@@ -112,13 +132,18 @@ const encodeWhereCondition = (
     ),
     )
   } else if (operator === 'includes') {
-  // Use COLLATE NOCASE for case-insensitive Unicode search
-  return `instr("${table}"."${left}" COLLATE NOCASE, ${getComparisonRight(table, comparison.right)} COLLATE NOCASE)`
+  // Use LOWER() for case-insensitive Unicode search (better than COLLATE NOCASE for Cyrillic)
+  return `instr(LOWER("${table}"."${left}"), ${getComparisonRightLower(table, comparison.right)})`
 }
 
-// For equality comparisons with text, use COLLATE NOCASE for Unicode support
+// For text operations with Unicode support, use LOWER() function
+if ((operator === 'like' || operator === 'notLike') && typeof comparison.right.value === 'string') {
+  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
+}
+
+// For equality comparisons with text, use LOWER() for Unicode support
 if ((operator === 'eq' || operator === 'notEq') && typeof comparison.right.value === 'string') {
-  return `"${table}"."${left}" COLLATE NOCASE ${encodeComparison(table, comparison)}`
+  return `LOWER("${table}"."${left}") ${operators[operator]} ${getComparisonRightLower(table, comparison.right)}`
 }
 
 return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
