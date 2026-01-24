@@ -63,7 +63,13 @@ public class WMDatabase {
             database.enableWriteAheadLogging();
         }
         database.execSQL("PRAGMA case_sensitive_like=OFF;");
-        database.execSQL("PRAGMA encoding = 'UTF-8'")
+        database.execSQL("PRAGMA encoding = 'UTF-8';");
+        // Additional ICU support settings
+        try {
+            database.execSQL("PRAGMA temp_store = MEMORY;");
+        } catch (Exception e) {
+            // Ignore if not supported
+        }
         return database;
     }
 
