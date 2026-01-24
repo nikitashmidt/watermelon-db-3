@@ -59,6 +59,16 @@ public class WMDatabase {
             path = context.getDatabasePath("" + name + ".db").getPath().replace("/databases", "");
         }
         String safePassword = password == null ? "" : password;
+
+        // НОВОЕ ИЗМЕНЕНИЕ: Явно загружаем нативную библиотеку ICU
+        try {
+            System.loadLibrary("sqlcipher_android_icu");
+            Log.d("WMDatabase", "Loaded sqlcipher_android_icu library.");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e("WMDatabase", "Failed to load sqlcipher_android_icu library. ICU collation will not be available.", e);
+            // Возможно, здесь можно fallback на ASCII-only режим, но пока просто логируем
+        }
+
         SQLiteDatabase.loadLibs(context);
 
         SQLiteDatabaseHook hook = new SQLiteDatabaseHook() {
