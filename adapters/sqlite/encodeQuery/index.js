@@ -191,6 +191,11 @@ var encodeQuery = function (query, countMode = false) {
     (0, _common.invariant)(!description.lokiTransform, 'unsafeLokiTransform not supported with SQLite');
   }
   var sql = encodeMethod(table, countMode, hasToManyJoins) + encodeJoin(description, associations) + encodeConditions(table, description, associations) + encodeOrderBy(table, description.sortBy) + encodeLimitOffset(description.take, description.skip);
+
+  // НОВОЕ ИЗМЕНЕНИЕ: Логируем сгенерированный SQL
+  if ('production' !== process.env.NODE_ENV) {
+    _common.logger.log("[WatermelonDB] Generated SQL: ".concat(sql));
+  }
   return [sql, []];
 };
 var _default = exports.default = encodeQuery;

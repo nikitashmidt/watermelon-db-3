@@ -199,13 +199,13 @@ public class WMDatabase {
 
     private ArrayList<String> getAllTables() {
         ArrayList<String> allTables = new ArrayList<>();
-        try (Cursor cursor = rawQuery(Queries.select_tables)) { // ИЗМЕНЕНО: Использование `cursor`
+        try (Cursor cursor = rawQuery(Queries.select_tables)) {
             if (cursor.getCount() > 0 && cursor.moveToFirst()) {
                 int nameIndex = cursor.getColumnIndex("name");
                 if (nameIndex > -1) {
                     do {
                         allTables.add(cursor.getString(nameIndex));
-                    } while (cursor.moveToNext()); // ИЗМЕНЕНО: Использование `cursor`
+                    } while (cursor.moveToNext());
                 }
             }
         }
