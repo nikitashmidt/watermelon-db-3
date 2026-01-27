@@ -76,6 +76,31 @@ SqliteDb::SqliteDb(std::string path, const char *password) {
         }
     }
     assert(sqlite != nullptr);
+
+
+    sqlite3_enable_load_extension(sqlite, 1);
+
+     char* icuError = nullptr;
+    int icuRc = sqlite3_load_extension(sqlite, 
+        "./native/sqlite-cipher-amalgamation/libSqliteIcu.so",  // Путь к библиотеке
+        "sqlite3_icu_init", 
+        &icuError);
+    
+    if (icuRc == SQLITE_OK) {
+        // 3. Инициализировать ICU колляции
+        sqlite3_exec(sqlite, 
+            "SELECT icu_load_collation('en_US', 'nocase_icu'); "
+            "SELECT icu_load_collation('ru_RU', 'russian');",
+            nullptr, nullptr, nullptr);
+        
+        consoleLog("ICU extension loaded successfully");
+    } else if (icuError) {
+        // Логируем ошибку, но не падаем
+        consoleLog("Failed to load ICU: " + std::string(icuError));
+        sqlite3_free(icuError);
+    }
+
+
 #ifdef SQLITE_HAS_CODEC
     if (password != nullptr && strlen(password) > 0) {
         sqlite3_key(sqlite, password, (int)strlen(password));
