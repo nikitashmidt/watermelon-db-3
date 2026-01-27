@@ -15,6 +15,12 @@ find_library(ICUI18N_LIB icui18n)
 # (surely there's a better way to do this)
 # This has to work with standard RN project, Nozbe's unusual folder structure and internal Watermelon tester
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(ICU_INCLUDE_DIR ${CMAKE_ANDROID_NDK}/sources/third_party/icu)
+set(ICU_LIB_DIR ${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${ANDROID_ABI})
+
 get_filename_component(_nativeTesterPath "../../../../../node_modules/@nozbe/sqlite/" REALPATH)
 get_filename_component(_nozbePath "../../../../../../../../../native/node_modules/react-native/ReactCommon/jsi/jsi/" REALPATH)
 
@@ -105,10 +111,11 @@ target_link_libraries(watermelondb-jsi
                       android
                       log
                       ${openSSLLib}
-                      ${ICUUC_LIB}
-                      ${ICUI18N_LIB}
+                      icuuc
+                      icui18n
                       )
 
 target_compile_definitions(watermelondb-jsi PRIVATE
     SQLITE_ENABLE_ICU=1
+    SQLITE_DEFAULT_COLLATION=russian
 )

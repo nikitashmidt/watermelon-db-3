@@ -40,7 +40,6 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getExtOrDefault('kotlinVersion')}"
     // Needed for encrypted SQLite databases (passphrase option) on Android
     implementation 'net.zetetic:android-database-sqlcipher:4.5.0'
-    implementation 'androidx.icu:icu:1.0.0'
 }
 
 repositories {
