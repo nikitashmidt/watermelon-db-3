@@ -80,6 +80,7 @@ add_library(watermelondb-jsi SHARED
         # vendor files
         ${SQLITE_PATH}/sqlite3.c
         ${SQLITE_PATH}/sqlite3.h
+        ${SQLITE_PATH}/icu.c
         ${NODE_MODULES_PATH_WM}/@nozbe/simdjson/src/simdjson.cpp
         # our sources
         ${ANDROID_JSI_SRC_FILES}
