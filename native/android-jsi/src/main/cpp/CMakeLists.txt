@@ -7,6 +7,9 @@ cmake_minimum_required(VERSION 3.4.1)
 # NOTE: This may need to be bumped sometimes to force CMake caches to clear
 set(WMELON_JSI_BUMP 4)
 
+find_library(ICUUC_LIB icuuc)
+find_library(ICUI18N_LIB icui18n)
+
 # -------------------------------------------------
 # Figure out where node_modules is
 # (surely there's a better way to do this)
@@ -102,4 +105,10 @@ target_link_libraries(watermelondb-jsi
                       android
                       log
                       ${openSSLLib}
+                      ${ICUUC_LIB}
+                      ${ICUI18N_LIB}
                       )
+
+target_compile_definitions(watermelondb-jsi PRIVATE
+    SQLITE_ENABLE_ICU=1
+)
