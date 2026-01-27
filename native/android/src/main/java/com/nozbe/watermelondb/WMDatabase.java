@@ -62,7 +62,7 @@ public class WMDatabase {
         if (enableWriteAheadLogging) {
             database.enableWriteAheadLogging();
         }
-        // database.execSQL("SELECT icu_load_collation('ru_RU', 'russian')");
+        database.execSQL("SELECT icu_load_collation('ru_RU', 'russian')");
         return database;
     }
 
