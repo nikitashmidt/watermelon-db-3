@@ -111,11 +111,15 @@ target_link_libraries(watermelondb-jsi
                       android
                       log
                       ${openSSLLib}
-                      icuuc
-                      icui18n
+                      ${ICUUC_LIB}
+                      ${ICUI18N_LIB}
                       )
 
 target_compile_definitions(watermelondb-jsi PRIVATE
     SQLITE_ENABLE_ICU=1
     SQLITE_DEFAULT_COLLATION=russian
+    SQLITE_HAS_CODEC=1
+    SQLITE_TEMP_STORE=2
+    SQLITE_ENABLE_FTS5=1
+    SQLITE_ENABLE_JSON1=1
 )
