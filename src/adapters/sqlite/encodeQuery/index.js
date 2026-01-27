@@ -1,7 +1,7 @@
 // @flow
 /* eslint-disable no-use-before-define */
 
-import { invariant, logger } from '../../../utils/common'
+import { invariant } from '../../../utils/common'
 import type { SerializedQuery, QueryAssociation } from '../../../Query'
 import type {
   NonNullValues,
@@ -31,7 +31,7 @@ const getComparisonRight = (table: TableName<any>, comparisonRight: ComparisonRi
   if (comparisonRight.values) {
     return encodeValues(comparisonRight.values)
   } else if (comparisonRight.column) {
-    return `\"${table}\".\"${comparisonRight.column}\"`
+    return `"${table}"."${comparisonRight.column}"`
   }
 
   return typeof comparisonRight.value !== 'undefined' ? encodeValue(comparisonRight.value) : 'null'
@@ -63,38 +63,33 @@ const encodeComparison = (table: TableName<any>, comparison: Comparison) => {
       : ''
   }
 
-  // ИЗМЕНЕНИЕ: Для 'like' и 'notLike' добавляем COLLATE UNICODE_NOCASE
-  if (operator === 'like' || operator === 'notLike') {
-    return `${operators[operator]} ${getComparisonRight(table, comparison.right)} COLLATE UNICODE_NOCASE`
-  }
-
   return `${operators[operator]} ${getComparisonRight(table, comparison.right)}`
 }
 
 const encodeWhere =
   (table: TableName<any>, associations: QueryAssociation[]) =>
-    (where: Where): string => {
-      switch (where.type) {
-        case 'and':
-          return `(${encodeAndOr(associations, 'and', table, where.conditions)})`
-        case 'or':
-          return `(${encodeAndOr(associations, 'or', table, where.conditions)})`
-        case 'where':
-          return encodeWhereCondition(associations, table, where.left, where.comparison)
-        case 'on':
-          if (process.env.NODE_ENV !== 'production') {
-            invariant(
-              associations.some(({ to }) => to === where.table),
-              'To nest Q.on inside Q.and/Q.or you must explicitly declare Q.experimentalJoinTables at the beginning of the query',
-            )
-          }
-          return `(${encodeAndOr(associations, 'and', where.table, where.conditions)})`
-        case 'sql':
-          return where.expr
-        default:
-          throw new Error(`Unknown clause ${where.type}`)
-      }
+  (where: Where): string => {
+    switch (where.type) {
+      case 'and':
+        return `(${encodeAndOr(associations, 'and', table, where.conditions)})`
+      case 'or':
+        return `(${encodeAndOr(associations, 'or', table, where.conditions)})`
+      case 'where':
+        return encodeWhereCondition(associations, table, where.left, where.comparison)
+      case 'on':
+        if (process.env.NODE_ENV !== 'production') {
+          invariant(
+            associations.some(({ to }) => to === where.table),
+            'To nest Q.on inside Q.and/Q.or you must explicitly declare Q.experimentalJoinTables at the beginning of the query',
+          )
+        }
+        return `(${encodeAndOr(associations, 'and', where.table, where.conditions)})`
+      case 'sql':
+        return where.expr
+      default:
+        throw new Error(`Unknown clause ${where.type}`)
     }
+  }
 
 const encodeWhereCondition = (
   associations: QueryAssociation[],
@@ -114,14 +109,13 @@ const encodeWhereCondition = (
         // $FlowFixMe
         Q.where(left, Q.gt(Q.column(comparison.right.column))),
         Q.and(Q.where(left, Q.notEq(null)), Q.where((comparison.right: any).column, null)),
-    ),
+      ),
     )
   } else if (operator === 'includes') {
-  // ИЗМЕНЕНИЕ: Для 'includes' также добавляем COLLATE UNICODE_NOCASE, так как это тоже поиск по подстроке
-  return `instr(\"${table}\".\"${left}\" COLLATE UNICODE_NOCASE, ${getComparisonRight(table, comparison.right)} COLLATE UNICODE_NOCASE)`
-}
+    return `instr("${table}"."${left}", ${getComparisonRight(table, comparison.right)})`
+  }
 
-return `\"${table}\".\"${left}\" ${encodeComparison(table, comparison)}`
+  return `"${table}"."${left}" ${encodeComparison(table, comparison)}`
 }
 
 const encodeAndOr = (
@@ -141,7 +135,7 @@ const andJoiner = ' and '
 const encodeConditions = (
   table: TableName<any>,
   description: QueryDescription,
-  associations: QueryAssociation[]
+  associations: QueryAssociation[],
 ): string => {
   const clauses = mapJoin(description.where, encodeWhere(table, associations), andJoiner)
 
@@ -157,39 +151,39 @@ const encodeMethod = (
 ): string => {
   if (countMode) {
     return needsDistinct
-      ? `select count(distinct \"${table}\".id) as \"count\" from \"${table}\"`
-      : `select count(*) as \"count\" from \"${table}\"`
+      ? `select count(distinct "${table}"."id") as "count" from "${table}"`
+      : `select count(*) as "count" from "${table}"`
   }
 
   return needsDistinct
-    ? `select distinct \"${table}\".* from \"${table}\"`
-    : `select \"${table}\".* from \"${table}\"`
+    ? `select distinct "${table}".* from "${table}"`
+    : `select "${table}".* from "${table}"`
 }
 
 const encodeAssociation =
   (description: QueryDescription) =>
-    ({ from: mainTable, to: joinedTable, info: association }: QueryAssociation): string => {
-      // TODO: We have a problem here. For all of eternity, WatermelonDB Q.ons were encoded using JOIN
-      // However, this precludes many legitimate use cases for Q.ons once you start nesting them
-      // (e.g. get tasks where X or has a tag assignment that Y -- if there is no tag assignment, this will
-      // fail to join)
-      // LEFT JOIN needs to be used to address this… BUT technically that's a breaking change. I never
-      // considered a possiblity of making a query like `Q.on(relation_id, x != 'bla')`. Before this would
-      // only match if there IS a relation, but with LEFT JOIN it would also match if record does not have
-      // this relation. I don't know if there are legitimate use cases where this would change anything
-      // so I need more time to think about whether this breaking change is OK to make or if we need to
-      // do something more clever/add option/whatever.
-      // so for now, i'm making an extreeeeemelyyyy bad hack to make sure that there's no breaking change
-      // for existing code and code with nested Q.ons probably works (with caveats)
-      const usesOldJoinStyle = description.where.some(
-        (clause) => clause.type === 'on' && clause.table === joinedTable,
-      )
-      const joinKeyword = usesOldJoinStyle ? ' join ' : ' left join '
-      const joinBeginning = `${joinKeyword}\"${joinedTable}\" on \"${joinedTable}\".`
-      return association.type === 'belongs_to'
-        ? `${joinBeginning}\"id\" = \"${mainTable}\".\"${association.key}\"`
-        : `${joinBeginning}\"${association.foreignKey}\" = \"${mainTable}\".\"id\"`
-    }
+  ({ from: mainTable, to: joinedTable, info: association }: QueryAssociation): string => {
+    // TODO: We have a problem here. For all of eternity, WatermelonDB Q.ons were encoded using JOIN
+    // However, this precludes many legitimate use cases for Q.ons once you start nesting them
+    // (e.g. get tasks where X or has a tag assignment that Y -- if there is no tag assignment, this will
+    // fail to join)
+    // LEFT JOIN needs to be used to address this… BUT technically that's a breaking change. I never
+    // considered a possiblity of making a query like `Q.on(relation_id, x != 'bla')`. Before this would
+    // only match if there IS a relation, but with LEFT JOIN it would also match if record does not have
+    // this relation. I don't know if there are legitimate use cases where this would change anything
+    // so I need more time to think about whether this breaking change is OK to make or if we need to
+    // do something more clever/add option/whatever.
+    // so for now, i'm making an extreeeeemelyyyy bad hack to make sure that there's no breaking change
+    // for existing code and code with nested Q.ons probably works (with caveats)
+    const usesOldJoinStyle = description.where.some(
+      (clause) => clause.type === 'on' && clause.table === joinedTable,
+    )
+    const joinKeyword = usesOldJoinStyle ? ' join ' : ' left join '
+    const joinBeginning = `${joinKeyword}"${joinedTable}" on "${joinedTable}".`
+    return association.type === 'belongs_to'
+      ? `${joinBeginning}"id" = "${mainTable}"."${association.key}"`
+      : `${joinBeginning}"${association.foreignKey}" = "${mainTable}"."id"`
+  }
 
 const encodeJoin = (description: QueryDescription, associations: QueryAssociation[]): string =>
   associations.length ? associations.map(encodeAssociation(description)).join('') : ''
@@ -200,7 +194,7 @@ const encodeOrderBy = (table: TableName<any>, sortBys: SortBy[]) => {
   }
   const orderBys = sortBys
     .map((sortBy) => {
-      return `\"${table}\".\"${sortBy.sortColumn}\" ${sortBy.sortOrder}`
+      return `"${table}"."${sortBy.sortColumn}" ${sortBy.sortOrder}`
     })
     .join(', ')
   return ` order by ${orderBys}`
@@ -241,11 +235,6 @@ const encodeQuery = (query: SerializedQuery, countMode: boolean = false): [SQL, 
     encodeConditions(table, description, associations) +
     encodeOrderBy(table, description.sortBy) +
     encodeLimitOffset(description.take, description.skip)
-
-  // НОВОЕ ИЗМЕНЕНИЕ: Логируем сгенерированный SQL
-  if (process.env.NODE_ENV !== 'production') {
-    logger.log(`[WatermelonDB] Generated SQL: ${sql}`);
-  }
 
   return [sql, []]
 }
