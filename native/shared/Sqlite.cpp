@@ -80,27 +80,59 @@ SqliteDb::SqliteDb(std::string path, const char *password) {
 
     sqlite3_enable_load_extension(sqlite, 1);
 
-     char* icuError = nullptr;
-    int icuRc = sqlite3_load_extension(sqlite, 
-        "./native/sqlite-cipher-amalgamation/libSqliteIcu.so",  // Путь к библиотеке
+char* icuError = nullptr;
+int icuRc = SQLITE_ERROR;  // ← ИНИЦИАЛИЗИРУЕМ переменную
+
+// Попробуйте эти пути (один из них должен работать)
+const char* possiblePaths[] = {
+    // 1. Если библиотека в assets (нужно распаковать)
+    "/data/data/com.yourapp/files/libSqliteIcu.so",  // ← ЗАМЕНИТЕ на ваш package
+    
+    // 2. Если в jniLibs (автоматически копируется)
+    "libSqliteIcu.so",  // Просто имя файла
+    
+    // 3. Временные пути для тестирования
+    "/data/local/tmp/libSqliteIcu.so",
+    "/sdcard/libSqliteIcu.so",
+    
+    nullptr
+};
+
+// Перебираем пути
+for (int i = 0; possiblePaths[i] != nullptr; i++) {
+    icuError = nullptr;  // Сбрасываем ошибку для каждой попытки
+    icuRc = sqlite3_load_extension(sqlite, 
+        possiblePaths[i],
         "sqlite3_icu_init", 
         &icuError);
-
-        consoleLog("icuRc: " icuRc));
     
     if (icuRc == SQLITE_OK) {
-        // 3. Инициализировать ICU колляции
-        sqlite3_exec(sqlite, 
-            "SELECT icu_load_collation('en_US', 'nocase_icu'); "
-            "SELECT icu_load_collation('ru_RU', 'russian');",
-            nullptr, nullptr, nullptr);
-        
-        consoleLog("ICU extension loaded successfully");
+        consoleLog("ICU loaded from: " + std::string(possiblePaths[i]));
+        break;
     } else if (icuError) {
-        // Логируем ошибку, но не падаем
-        consoleLog("Failed to load ICU: " + std::string(icuError));
+        consoleLog("Failed to load from " + std::string(possiblePaths[i]) + 
+                  ": " + std::string(icuError));
+        sqlite3_free(icuError);
+        icuError = nullptr;
+    }
+}
+
+// Теперь icuRc содержит результат последней попытки
+if (icuRc == SQLITE_OK) {
+    // Инициализируем ICU колляции
+    sqlite3_exec(sqlite, 
+        "SELECT icu_load_collation('en_US', 'nocase_icu'); "
+        "SELECT icu_load_collation('ru_RU', 'russian');",
+        nullptr, nullptr, nullptr);
+    
+    consoleLog("ICU extension loaded successfully");
+} else {
+    consoleLog("ICU extension failed to load from all paths");
+    if (icuError) {
+        consoleLog("Last error: " + std::string(icuError));
         sqlite3_free(icuError);
     }
+}
 
 
 #ifdef SQLITE_HAS_CODEC
