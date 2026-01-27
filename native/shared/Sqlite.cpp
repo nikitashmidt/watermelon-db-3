@@ -85,6 +85,8 @@ SqliteDb::SqliteDb(std::string path, const char *password) {
         "./native/sqlite-cipher-amalgamation/libSqliteIcu.so",  // Путь к библиотеке
         "sqlite3_icu_init", 
         &icuError);
+
+        consoleLog("icuRc: " icuRc));
     
     if (icuRc == SQLITE_OK) {
         // 3. Инициализировать ICU колляции
